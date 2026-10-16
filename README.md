@@ -33,6 +33,7 @@ Everything runs on your Mac over your home Wi-Fi. No app to install, no internet
 | `Shift` + `F1`–`F9`  | Save Preview to a slot (or shift-click a slot button)                                           |
 | `L`                  | LIVE edit: the panel edits Program instead of Preview                                           |
 | `B`                  | Beat cut on/off                                                                                 |
+| `D`                  | Auto director on/off                                                                            |
 
 - **Layers:** each scene is a stack of layers. Each layer has a source, an effect chain, a blend mode
   and an opacity. Click **+ Add layer** to superimpose a second camera.
@@ -63,6 +64,26 @@ Pick an input in the top bar. The meters next to it show the five signals:
   shows the live value. Links are saved with scene slots.
 - **Beat cut:** switches Program to the next camera with video every 1, 2, 4 or 8 beats.
   Layers and effects stay. Press `B` to turn it on and off.
+
+## Auto director
+
+Click **🤖 Auto director** (or press `D`) and StageCam directs the show for you. On each new shot it:
+
+- picks a camera that has video, different from the one on air;
+- picks a **look**, an effect combo with ♪ links, from `web/src/director/looks.ts`;
+- sometimes superimposes a second camera with a blend mode;
+- chooses a hard cut or a transition.
+
+It paces itself with the music's energy:
+
+- **Wild:** 2–4-beat shots, mostly hard cuts.
+- **Mid:** 8-beat shots, a mix of cuts and quick transitions.
+- **Calm:** 16-beat shots with slow crossfades.
+- **No audio input:** it changes shots every 3–7 seconds.
+
+Choose **🎃 Halloween** next to the button to use only the creepy looks. If you cut, press AUTO or put
+a slot live by hand, your shot gets a full shot length before the auto director moves on. To add a
+look, append it to `LOOKS`. A unit test checks that it only uses effects and params that exist.
 
 ## Camera health
 
@@ -103,12 +124,13 @@ vec4 effect(vec2 uv) {
 
 Requires Node 24 (`.nvmrc`). The tooling is [Vite+](https://viteplus.dev) (`vp`).
 
-| Command         | What it does                                                                     |
-| --------------- | -------------------------------------------------------------------------------- |
-| `npm run dev`   | Server with Vite middleware (reload the page to see changes)                     |
-| `npm start`     | Production build + server                                                        |
-| `npm run check` | Format check, lint, typecheck, unit tests                                        |
-| `npm run e2e`   | Real Chrome with 2 fake cameras: connect, effects, transitions, tally, fail-safe |
+| Command           | What it does                                                                     |
+| ----------------- | -------------------------------------------------------------------------------- |
+| `npm run dev`     | Server with Vite middleware (reload the page to see changes)                     |
+| `npm start`       | Production build + server                                                        |
+| `npm run check`   | Format check, lint, typecheck, unit tests                                        |
+| `npm run gallery` | Renders every effect on a test portrait into `tests/output/gallery.png`          |
+| `npm run e2e`     | Real Chrome with 2 fake cameras: connect, effects, transitions, tally, fail-safe |
 
 ### Ports and files
 
