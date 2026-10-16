@@ -18,6 +18,9 @@ vec3 hsv2rgb(vec3 c) {
 }
 `;
 
+/** Full fragment source for custom effects: shared header and helpers, then `body` (uniforms + main). */
+export const fragment = (body: string) => `${HEADER}${LIBRARY}${body}`;
+
 const paramUniforms = (params: ParamDef[]) =>
   params.map((p) => `uniform float u_${p.key};`).join('\n');
 
