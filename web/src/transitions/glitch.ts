@@ -6,7 +6,7 @@ export default {
   glsl: `
 vec4 transition(vec2 uv) {
   float intensity = sin(u_progress * 3.14159);
-  float t = floor(u_time * 24.0);
+  float t = mod(floor(u_time * 24.0), 1000.0);
   vec2 block = floor(uv * vec2(12.0, 20.0));
   float r = hash(block + t);
   vec2 p = uv + vec2((hash(vec2(block.y, t)) - 0.5) * 0.3 * intensity * step(0.6, r), 0.0);
