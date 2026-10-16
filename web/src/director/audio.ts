@@ -48,6 +48,8 @@ export class AudioAnalyzer {
     const analyser = context.createAnalyser();
     analyser.fftSize = 2048;
     analyser.smoothingTimeConstant = 0.55;
+    // Headroom above the default -30 dB, so loud kicks don't saturate every bass bin at 255.
+    analyser.maxDecibels = -10;
     // Analysis only: never connected to the speakers, so a mic doesn't feed back.
     context.createMediaStreamSource(new MediaStream([track])).connect(analyser);
     this.#context = context;
@@ -80,15 +82,16 @@ export class AudioAnalyzer {
       const to = Math.min(this.#bins.length - 1, Math.ceil(high / hzPerBin));
       let sum = 0;
       for (let i = from; i <= to; i++) sum += this.#bins[i];
-      return Math.min(1, (sum / (to - from + 1) / 255) * this.gain);
+      return (sum / (to - from + 1) / 255) * this.gain;
     };
     const bass = band(BANDS.bass);
+    // Unclamped: the detector compares with its own average, and clamping at 1 would flatten kicks.
     if (this.beats.update(bass, now)) this.onBeat();
     this.signals = {
-      bass,
-      mid: band(BANDS.mid),
-      high: band(BANDS.high),
-      level: band(BANDS.level),
+      bass: Math.min(1, bass),
+      mid: Math.min(1, band(BANDS.mid)),
+      high: Math.min(1, band(BANDS.high)),
+      level: Math.min(1, band(BANDS.level)),
       beat: this.beats.pulse(now),
     };
     return this.signals;
@@ -98,7 +101,7 @@ export class AudioAnalyzer {
 function captureMic(deviceId: string): Promise<MediaStream> {
   return navigator.mediaDevices.getUserMedia({
     audio: {
-      deviceId: deviceId ? { exact: deviceId } : undefined,
+      deviceId: deviceId && deviceId !== 'default' ? { exact: deviceId } : undefined,
       echoCancellation: false,
       noiseSuppression: false,
       autoGainControl: false,
@@ -118,7 +121,10 @@ function captureMusic(): Promise<MediaStream> {
 
 export async function listMics(): Promise<{ id: string; label: string }[]> {
   const devices = await navigator.mediaDevices.enumerateDevices();
-  return devices
-    .filter((d) => d.kind === 'audioinput')
-    .map((d, i) => ({ id: d.deviceId, label: d.label || `Microphone ${i + 1}` }));
+  return (
+    devices
+      .filter((d) => d.kind === 'audioinput')
+      // Before mic permission the id is '', which would mean "Audio off"; 'default' asks for the default mic.
+      .map((d, i) => ({ id: d.deviceId || 'default', label: d.label || `Microphone ${i + 1}` }))
+  );
 }

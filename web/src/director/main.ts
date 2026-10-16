@@ -402,7 +402,10 @@ sensitivity.oninput = () => {
   localStorage.setItem(SENSITIVITY_KEY, sensitivity.value);
 };
 navigator.mediaDevices.addEventListener('devicechange', () => void renderAudioInputs());
-document.addEventListener('pointerdown', () => analyzer.resume());
+// Keyboard-only directing is a user gesture too; without one a restored mic stays suspended.
+for (const type of ['pointerdown', 'keydown'] as const) {
+  document.addEventListener(type, () => analyzer.resume());
+}
 
 async function restoreAudio() {
   await renderAudioInputs();
@@ -440,7 +443,11 @@ function beatCut() {
   const index = withVideo.findIndex((c) => c.info.id === base.sourceId);
   base.sourceId = withVideo[(index + 1) % withVideo.length].info.id;
   renderMultiview();
-  if (live) renderPanelNow();
+  // A full rebuild on every beat would cut off a slider drag in LIVE edit; sync only the source picker.
+  if (live) {
+    const picker = $('panel').querySelector<HTMLSelectElement>('.card-head select');
+    if (picker) picker.value = base.sourceId;
+  }
 }
 
 analyzer.onBeat = () => {

@@ -24,6 +24,11 @@ describe('BeatDetector', () => {
     for (const gap of gaps) expect(gap).toBeCloseTo(500, -2);
   });
 
+  it('still finds beats in loud music with sensitivity turned up (values above 1)', () => {
+    const loud = (now: number) => (now % 500 < 60 ? 3.2 : 1.6);
+    expect(run(new BeatDetector(), loud, 8000).length).toBeGreaterThanOrEqual(15);
+  });
+
   it('stays quiet on silence and on a steady hum', () => {
     expect(run(new BeatDetector(), () => 0, 4000)).toEqual([]);
     expect(run(new BeatDetector(), () => 0.5, 4000).length).toBeLessThanOrEqual(1);
