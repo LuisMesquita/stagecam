@@ -81,7 +81,15 @@ document.addEventListener('visibilitychange', async () => {
   if (!stream) return;
   void keepAwake();
   const track = stream.getVideoTracks()[0];
-  if (!track || track.readyState === 'ended' || track.muted) await restartCamera();
+  if (!track || track.readyState === 'ended') await restartCamera();
+  else if (track.muted) {
+    // iOS unmutes an interrupted capture by itself shortly after the page is back; restart only if not.
+    setTimeout(() => {
+      if (track.muted && track.readyState === 'live' && stream?.getVideoTracks()[0] === track) {
+        void restartCamera();
+      }
+    }, 1500);
+  }
   if (Date.now() - hiddenAt > RESUME_AFTER_MS) {
     setStatus('Reconnecting to the Mac…');
     signal.reconnectNow();
@@ -213,6 +221,7 @@ async function restartCamera() {
     showOverlay(cameraErrorText(error));
     return;
   }
+  overlay.hidden = true;
   showStream();
   const track = stream.getVideoTracks()[0];
   if (sender) await sender.replaceTrack(track);
