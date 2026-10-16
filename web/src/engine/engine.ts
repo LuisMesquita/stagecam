@@ -13,7 +13,7 @@ import {
 } from './scene.ts';
 import type { EffectInstance, Scene, Signals } from './scene.ts';
 import { BLEND, BLEND_MODES, NORMALIZE, effectSource, transitionSource } from './shaders.ts';
-import type { EffectRuntime, FrameContext } from './types.ts';
+import type { EffectRuntime, Face, FrameContext } from './types.ts';
 
 /** A source with no new frame for this long is "lost"; on Program it triggers the fail-safe. */
 export const LOST_AFTER_MS = 2000;
@@ -62,6 +62,8 @@ export class Engine {
   /** Called with the lost source ids when the fail-safe takes Program to the safe scene. */
   onFailSafe: (lost: string[]) => void = () => {};
   onError: (error: Error) => void = (error) => console.error(error);
+  /** Tracked faces on a camera, in output pixels; the director wires in the face tracker. */
+  faces: (sourceId: string) => Face[] = () => [];
 
   #sources = new Map<string, Source>();
   #rotations = new Map<string, number>();
@@ -143,6 +145,36 @@ export class Engine {
     return now - (source.lastFrameAt || source.addedAt);
   }
 
+  /** Video and placement of a camera, for the face tracker. */
+  sourceInfo(
+    id: string,
+  ): { video: HTMLVideoElement; aspect: number; rotation: number; mirror: boolean } | null {
+    const source = this.#sources.get(id);
+    const video = source?.video;
+    if (!source || !video || !video.videoWidth) return null;
+    return {
+      video,
+      aspect: video.videoWidth / video.videoHeight,
+      rotation: this.rotation(id),
+      mirror: source.mirror,
+    };
+  }
+
+  /** Cameras that an enabled face effect is applied to, on Preview, Program or a running transition. */
+  sourcesNeedingFaces(): string[] {
+    const ids = new Set<string>();
+    const needs = (list: EffectInstance[]) =>
+      list.some((e) => e.enabled && effects.get(e.type)?.needsFaces);
+    const outputNeeds = needs(this.outputFx);
+    for (const scene of [this.preview, ...this.onAir]) {
+      if (outputNeeds && scene.layers[0]) ids.add(scene.layers[0].sourceId);
+      for (const layer of scene.layers) if (needs(layer.effects)) ids.add(layer.sourceId);
+    }
+    ids.delete(SLATE);
+    ids.delete(BLACK);
+    return [...ids];
+  }
+
   isLost(id: string, now = performance.now()): boolean {
     return this.staleness(id, now) > LOST_AFTER_MS;
   }
@@ -200,7 +232,11 @@ export class Engine {
     if (now - this.#lastTick < MIN_FRAME_MS) return null;
     this.#lastTick = now;
     this.#frame++;
-    const ctx: FrameContext = { time: (now - this.#startedAt) / 1000, resolution: [WIDTH, HEIGHT] };
+    const ctx: FrameContext = {
+      time: (now - this.#startedAt) / 1000,
+      resolution: [WIDTH, HEIGHT],
+      faces: [],
+    };
     const gpu = this.gpu;
     gpu.resetPool();
     this.#updateSources(now);
@@ -213,7 +249,13 @@ export class Engine {
       return target;
     };
 
-    const preview = this.#applyEffects(render(this.preview), this.outputFx, ctx, 'pv:');
+    const baseFaces = (scene: Scene) => ({ ...ctx, faces: this.faces(scene.layers[0]?.sourceId) });
+    const preview = this.#applyEffects(
+      render(this.preview),
+      this.outputFx,
+      baseFaces(this.preview),
+      'pv:',
+    );
     let program: Target;
     const active = this.#active;
     if (active) {
@@ -223,7 +265,12 @@ export class Engine {
     } else {
       program = render(this.program);
     }
-    program = this.#applyEffects(program, this.outputFx, ctx, 'pg:');
+    program = this.#applyEffects(
+      program,
+      this.outputFx,
+      baseFaces(active ? active.to : this.program),
+      'pg:',
+    );
     this.#collectRuntimes();
     this.#last = { preview, program };
     return this.#last;
@@ -240,7 +287,7 @@ export class Engine {
       const layerOut = this.#applyEffects(
         this.sourceTarget(layer.sourceId),
         layer.effects,
-        ctx,
+        { ...ctx, faces: this.faces(layer.sourceId) },
         '',
       );
       const out = gpu.alloc();

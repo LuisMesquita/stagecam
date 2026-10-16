@@ -11,6 +11,24 @@ export interface Target {
 export type Uniform = number | readonly number[] | { tex: WebGLTexture };
 export type Uniforms = Record<string, Uniform>;
 
+/** Indexed triangles with per-vertex attributes; attribute 0 is `a_pos`, 1 is `a_uv`. */
+export interface Mesh {
+  vao: WebGLVertexArrayObject;
+  buffers: WebGLBuffer[];
+  count: number;
+}
+
+export interface MeshAttribute {
+  size: number;
+  data: Float32Array;
+  dynamic?: boolean;
+}
+
+export interface MeshOptions {
+  blend?: 'alpha' | 'add';
+  cull?: boolean;
+}
+
 const VERTEX = `#version 300 es
 in vec2 a_pos;
 out vec2 v_uv;
@@ -120,12 +138,81 @@ export class Gpu {
     viewport?: [number, number],
   ): void {
     const gl = this.gl;
-    const { program, locations } = this.#compile(fragment);
-    gl.useProgram(program);
+    const entry = this.#compile(fragment);
+    gl.useProgram(entry.program);
     gl.bindFramebuffer(gl.FRAMEBUFFER, target ? target.fb : null);
     const [w, h] =
       viewport ?? (target ? [target.w, target.h] : [this.canvas.width, this.canvas.height]);
     gl.viewport(0, 0, w, h);
+    this.#setUniforms(entry, uniforms);
+    gl.bindVertexArray(this.#vao);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+
+  createMesh(attributes: MeshAttribute[], indices: Uint16Array): Mesh {
+    const gl = this.gl;
+    const vao = gl.createVertexArray()!;
+    gl.bindVertexArray(vao);
+    const buffers = attributes.map((attribute, location) => {
+      const buffer = gl.createBuffer()!;
+      gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+      gl.bufferData(
+        gl.ARRAY_BUFFER,
+        attribute.data,
+        attribute.dynamic ? gl.DYNAMIC_DRAW : gl.STATIC_DRAW,
+      );
+      gl.enableVertexAttribArray(location);
+      gl.vertexAttribPointer(location, attribute.size, gl.FLOAT, false, 0, 0);
+      return buffer;
+    });
+    const indexBuffer = gl.createBuffer()!;
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+    gl.bindVertexArray(this.#vao);
+    return { vao, buffers: [...buffers, indexBuffer], count: indices.length };
+  }
+
+  updateMesh(mesh: Mesh, attribute: number, data: Float32Array): void {
+    const gl = this.gl;
+    gl.bindBuffer(gl.ARRAY_BUFFER, mesh.buffers[attribute]);
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, data);
+  }
+
+  deleteMesh(mesh: Mesh): void {
+    mesh.buffers.forEach((buffer) => this.gl.deleteBuffer(buffer));
+    this.gl.deleteVertexArray(mesh.vao);
+  }
+
+  /** Draws a mesh on top of what the target already holds. */
+  drawMesh(
+    mesh: Mesh,
+    vertex: string,
+    fragment: string,
+    target: Target,
+    uniforms: Uniforms,
+    options: MeshOptions = {},
+  ): void {
+    const gl = this.gl;
+    const entry = this.#compile(fragment, vertex);
+    gl.useProgram(entry.program);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target.fb);
+    gl.viewport(0, 0, target.w, target.h);
+    this.#setUniforms(entry, uniforms);
+    if (options.blend) {
+      gl.enable(gl.BLEND);
+      if (options.blend === 'add') gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
+      else gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE);
+    }
+    if (options.cull) gl.enable(gl.CULL_FACE);
+    gl.bindVertexArray(mesh.vao);
+    gl.drawElements(gl.TRIANGLES, mesh.count, gl.UNSIGNED_SHORT, 0);
+    gl.disable(gl.BLEND);
+    gl.disable(gl.CULL_FACE);
+    gl.bindVertexArray(this.#vao);
+  }
+
+  #setUniforms({ program, locations }: Program, uniforms: Uniforms): void {
+    const gl = this.gl;
     let unit = 0;
     for (const [name, value] of Object.entries(uniforms)) {
       if (!locations.has(name)) locations.set(name, gl.getUniformLocation(program, name));
@@ -140,8 +227,6 @@ export class Gpu {
       else if (value.length === 3) gl.uniform3f(location, value[0], value[1], value[2]);
       else if (value.length === 4) gl.uniform4f(location, value[0], value[1], value[2], value[3]);
     }
-    gl.bindVertexArray(this.#vao);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
   }
 
   copy(source: Target, target: Target): void {
@@ -161,20 +246,22 @@ export class Gpu {
     this.draw(COPY, null, { u_input: { tex: source.tex } }, [w, h]);
   }
 
-  #compile(fragment: string): Program {
-    const cached = this.#programs.get(fragment);
+  #compile(fragment: string, vertex = VERTEX): Program {
+    const key = vertex === VERTEX ? fragment : `${vertex}\u0000${fragment}`;
+    const cached = this.#programs.get(key);
     if (cached) return cached;
     const gl = this.gl;
     const program = gl.createProgram()!;
-    gl.attachShader(program, this.#shader(gl.VERTEX_SHADER, VERTEX));
+    gl.attachShader(program, this.#shader(gl.VERTEX_SHADER, vertex));
     gl.attachShader(program, this.#shader(gl.FRAGMENT_SHADER, fragment));
     gl.bindAttribLocation(program, 0, 'a_pos');
+    gl.bindAttribLocation(program, 1, 'a_uv');
     gl.linkProgram(program);
     if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
       throw new Error(`Shader link failed: ${gl.getProgramInfoLog(program)}`);
     }
     const entry = { program, locations: new Map() };
-    this.#programs.set(fragment, entry);
+    this.#programs.set(key, entry);
     return entry;
   }
 
