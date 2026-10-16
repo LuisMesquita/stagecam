@@ -91,8 +91,12 @@ document.addEventListener('visibilitychange', async () => {
     }, 1500);
   }
   if (Date.now() - hiddenAt > RESUME_AFTER_MS) {
-    setStatus('Reconnecting to the Mac…');
-    signal.reconnectNow();
+    // Closing the socket drops messages queued while suspended ('kicked', 'renamed'): let them run first.
+    setTimeout(() => {
+      if (!stream) return;
+      setStatus('Reconnecting to the Mac…');
+      signal.reconnectNow();
+    }, 300);
   }
 });
 
