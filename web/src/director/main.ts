@@ -376,7 +376,7 @@ async function startAudio(input: string) {
     return;
   }
   try {
-    await analyzer.start(input);
+    if (!(await analyzer.start(input))) return;
     if (input !== MUSIC_ON_MAC) localStorage.setItem(AUDIO_KEY, input);
     else toast('Capturing music – keep the shared tab or screen open');
     await renderAudioInputs();

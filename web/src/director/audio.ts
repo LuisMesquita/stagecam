@@ -23,15 +23,25 @@ export class AudioAnalyzer {
   #analyser: AnalyserNode | null = null;
   #stream: MediaStream | null = null;
   #bins = new Uint8Array(0);
+  /** Bumped by stop(), so a capture that resolves after a newer start()/stop() is discarded. */
+  #generation = 0;
 
   get active(): boolean {
     return this.#analyser !== null;
   }
 
-  /** `deviceId` of a microphone, or MUSIC_ON_MAC to capture a tab or the whole screen's audio. */
-  async start(deviceId: string): Promise<void> {
+  /**
+   * `deviceId` of a microphone, or MUSIC_ON_MAC to capture a tab or the whole screen's audio.
+   * Resolves false when a later start() or stop() superseded this call.
+   */
+  async start(deviceId: string): Promise<boolean> {
     this.stop();
+    const generation = this.#generation;
     const stream = deviceId === MUSIC_ON_MAC ? await captureMusic() : await captureMic(deviceId);
+    if (generation !== this.#generation) {
+      stream.getTracks().forEach((t) => t.stop());
+      return false;
+    }
     const track = stream.getAudioTracks()[0];
     if (!track) {
       stream.getTracks().forEach((t) => t.stop());
@@ -56,6 +66,7 @@ export class AudioAnalyzer {
     this.#analyser = analyser;
     this.#stream = stream;
     this.#bins = new Uint8Array(analyser.frequencyBinCount);
+    return true;
   }
 
   /** Chrome starts an AudioContext suspended until the page gets a user gesture. */
@@ -64,6 +75,7 @@ export class AudioAnalyzer {
   }
 
   stop(): void {
+    this.#generation++;
     this.#stream?.getTracks().forEach((t) => t.stop());
     void this.#context?.close();
     this.#context = null;
