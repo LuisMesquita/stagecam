@@ -30,6 +30,7 @@ let pendingCandidates: RTCIceCandidateInit[] = [];
 let directorPresent = false;
 let wakeLock: WakeLockSentinel | null = null;
 let hiddenAt = 0;
+let kicked = false;
 /** iOS suspends background pages; after this long the socket and camera are likely dead. */
 const RESUME_AFTER_MS = 2000;
 
@@ -134,6 +135,7 @@ function handleMessage(msg: ServerMsg) {
       me.textContent = name;
       break;
     case 'kicked':
+      kicked = true;
       signal.stop();
       closePeer();
       stream?.getTracks().forEach((track) => track.stop());
@@ -221,12 +223,19 @@ async function openCamera(mode: Facing): Promise<MediaStream> {
 
 async function restartCamera() {
   stream?.getTracks().forEach((track) => track.stop());
+  let fresh: MediaStream;
   try {
-    stream = await openCamera(facing);
+    fresh = await openCamera(facing);
   } catch (error) {
-    showOverlay(cameraErrorText(error));
+    if (!kicked) showOverlay(cameraErrorText(error));
     return;
   }
+  if (kicked) {
+    // Kicked while the camera was reopening: release it and keep the message on screen.
+    fresh.getTracks().forEach((track) => track.stop());
+    return;
+  }
+  stream = fresh;
   overlay.hidden = true;
   showStream();
   const track = stream.getVideoTracks()[0];
