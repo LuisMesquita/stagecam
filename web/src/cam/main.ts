@@ -74,14 +74,15 @@ $('flip').addEventListener('click', async () => {
 
 document.addEventListener('visibilitychange', async () => {
   if (document.visibilityState === 'hidden') {
-    hiddenAt = performance.now();
+    // Wall clock: performance.now() can stand still while a locked iPhone sleeps.
+    hiddenAt = Date.now();
     return;
   }
   if (!stream) return;
   void keepAwake();
   const track = stream.getVideoTracks()[0];
   if (!track || track.readyState === 'ended' || track.muted) await restartCamera();
-  if (performance.now() - hiddenAt > RESUME_AFTER_MS) {
+  if (Date.now() - hiddenAt > RESUME_AFTER_MS) {
     setStatus('Reconnecting to the Mac…');
     signal.reconnectNow();
   }
