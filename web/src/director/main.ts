@@ -495,6 +495,8 @@ function setAutoDirector(on: boolean) {
 }
 
 function runAutoDirector(now: number) {
+  // Like beatCut(): let a running transition (a manual AUTO, the fail-safe) land before the next shot.
+  if (engine.transitioning) return;
   const decision = autoDirector.update({
     cameras: camerasWithVideo(),
     program: engine.program,
