@@ -6,6 +6,8 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-16
+
 ### Added
 
 - Halloween effects: blood moon, VHS horror tape, possessed and old horror film.
@@ -35,5 +37,6 @@ First release: a live multi-iPhone camera switcher for a party, LAN only.
   (port 8443, self-signed certificate) and WebSocket signaling.
 - Vite+ toolchain, unit tests and a Chrome end-to-end test with fake cameras and a fake microphone.
 
-[Unreleased]: https://github.com/LuisMesquita/stagecam/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/LuisMesquita/stagecam/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/LuisMesquita/stagecam/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/LuisMesquita/stagecam/releases/tag/v0.1.0
