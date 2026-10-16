@@ -16,10 +16,7 @@ import type { EffectInstance, Scene } from '../engine/scene.ts';
 import type { Tally } from '../shared/protocol.ts';
 import { Signal } from '../shared/signal.ts';
 import { AudioAnalyzer, MUSIC_ON_MAC, listMics } from './audio.ts';
-import { FaceTracker } from '../faces/tracker.ts';
-import type { TrackedSource } from '../faces/tracker.ts';
 import { AutoDirector } from './auto.ts';
-import { LOOKS } from './looks.ts';
 import type { AutoStyle } from './auto.ts';
 import { CameraManager } from './cameras.ts';
 import type { Camera } from './cameras.ts';
@@ -47,7 +44,6 @@ const engine = new Engine(glCanvas);
 const cameras = new CameraManager(engine, $('videos'));
 const analyzer = new AudioAnalyzer();
 const autoDirector = new AutoDirector();
-const faceTracker = new FaceTracker(WIDTH, HEIGHT);
 let autoLook = '';
 const previewCtx = ctx2d($<HTMLCanvasElement>('preview'));
 const programCtx = ctx2d($<HTMLCanvasElement>('program'));
@@ -95,8 +91,6 @@ engine.onFailSafe = (lost) => {
   const names = lost.map((id) => (cameras.cameras.has(id) ? cameras.label(id) : 'an old camera'));
   toast(`No video from ${names.join(', ')} – switched to the safe scene`);
 };
-engine.faces = (id) => faceTracker.faces(id);
-faceTracker.onError = (error) => toast(error.message);
 engine.onError = (error) => {
   console.error(error);
   toast(error.message.split('\n')[0]);
@@ -129,23 +123,12 @@ function frame() {
     engine.signals = analyzer.update(lastFrameAt);
     renderMeters();
     runAutoDirector(lastFrameAt);
-    trackFaces(lastFrameAt);
     const out = engine.tick(lastFrameAt);
     if (out) draw(out.preview, out.program);
   } catch (error) {
     engine.onError(error instanceof Error ? error : new Error(String(error)));
   }
   schedule();
-}
-
-/** Runs face tracking only on cameras that a face effect is applied to. */
-function trackFaces(now: number) {
-  const sources: TrackedSource[] = [];
-  for (const id of engine.sourcesNeedingFaces()) {
-    const info = engine.sourceInfo(id);
-    if (info) sources.push({ id, ...info });
-  }
-  faceTracker.update(sources, now);
 }
 
 function draw(preview: Target, program: Target) {
@@ -729,16 +712,7 @@ function toast(text: string) {
 }
 
 Object.assign(window, {
-  stagecam: {
-    engine,
-    cameras,
-    analyzer,
-    autoDirector,
-    faceTracker,
-    effectList,
-    transitionList,
-    looks: LOOKS,
-  },
+  stagecam: { engine, cameras, analyzer, autoDirector, effectList, transitionList },
 });
 
 renderSlots();

@@ -10,21 +10,10 @@ export interface ParamDef {
   default: number;
 }
 
-/**
- * A tracked face in output pixels: 478 landmarks × (x, y, z), origin bottom-left, y up,
- * z toward the camera. `blend` holds expression scores 0–1 (e.g. `jawOpen`, `eyeBlinkLeft`).
- */
-export interface Face {
-  points: Float32Array;
-  blend: Record<string, number>;
-}
-
 export interface FrameContext {
   /** Seconds since the engine started. */
   time: number;
   resolution: readonly [number, number];
-  /** Faces on the layer's camera; only filled for effects with `needsFaces`. */
-  faces: Face[];
 }
 
 export interface EffectRuntime {
@@ -36,8 +25,6 @@ interface EffectBase {
   id: string;
   name: string;
   params: ParamDef[];
-  /** Turns on face tracking for the cameras this effect is applied to. */
-  needsFaces?: boolean;
 }
 
 /**

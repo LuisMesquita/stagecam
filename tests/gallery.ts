@@ -1,6 +1,5 @@
 // Renders every effect on the face fixture and writes tests/output/gallery.png (a contact sheet).
 import { spawn, execFileSync } from 'node:child_process';
-import { readdirSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -40,11 +39,6 @@ const browser = await chromium.launch({
 });
 try {
   const director = await (await browser.newContext()).newPage();
-  director.on(
-    'console',
-    (m) => m.type() !== 'log' && console.log(`director ${m.type()}: ${m.text()}`),
-  );
-  director.on('pageerror', (e) => console.log(`director error: ${e.message}`));
   await director.goto('http://localhost:18082/director.html?codec=any');
   const cam = await (await browser.newContext({ ignoreHTTPSErrors: true })).newPage();
   await cam.goto(`https://${lanAddress()}:18445/cam.html`);
@@ -98,32 +92,6 @@ try {
         ],
       };
     }, id);
-    const needsFaces = await director.evaluate(
-      (effect) =>
-        !!(window as any).stagecam.effectList.find((d: any) => d.id === effect)?.needsFaces,
-      id,
-    );
-    if (needsFaces) {
-      await director
-        .waitForFunction(
-          () => {
-            const { cameras, faceTracker } = (window as any).stagecam;
-            const [camera] = [...cameras.cameras.values()];
-            return faceTracker.faces(camera.info.id).length > 0;
-          },
-          undefined,
-          { timeout: 30_000 },
-        )
-        .catch(async (error) => {
-          console.log(
-            await director.evaluate(() => {
-              const [camera] = [...(window as any).stagecam.cameras.cameras.values()];
-              return `video ${camera.video.videoWidth}x${camera.video.videoHeight}, tracker ${JSON.stringify((window as any).stagecam.faceTracker.stats)}`;
-            }),
-          );
-          throw error;
-        });
-    }
     await director.waitForTimeout(1200);
     const png = await director.$eval(
       '#preview',
@@ -158,7 +126,7 @@ try {
     '-i',
     join(FRAMES, '*.png'),
     '-vf',
-    `scale=480:-1,tile=${columns}x${Math.ceil(readdirSync(FRAMES).length / columns)}:padding=4:color=0x09090b`,
+    `scale=480:-1,tile=${columns}x${Math.ceil((ids.length + 1) / columns)}:padding=4:color=0x09090b`,
     '-frames:v',
     '1',
     join(OUT, 'gallery.png'),
