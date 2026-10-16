@@ -20,6 +20,8 @@ export default defineConfig({
   test: {
     root: import.meta.dirname,
     include: ['tests/**/*.test.ts'],
+    // The module cache keeps an expanded import.meta.glob, so new effect files would stay invisible.
+    fsModuleCache: false,
   },
   lint: {
     ignorePatterns: ['dist/**', 'node_modules/**'],

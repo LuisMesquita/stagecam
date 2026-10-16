@@ -16,6 +16,8 @@ import type { EffectInstance, Scene } from '../engine/scene.ts';
 import type { Tally } from '../shared/protocol.ts';
 import { Signal } from '../shared/signal.ts';
 import { AudioAnalyzer, MUSIC_ON_MAC, listMics } from './audio.ts';
+import { AutoDirector } from './auto.ts';
+import type { AutoStyle } from './auto.ts';
 import { CameraManager } from './cameras.ts';
 import type { Camera } from './cameras.ts';
 import { h } from './dom.ts';
@@ -41,6 +43,8 @@ const glCanvas = document.createElement('canvas');
 const engine = new Engine(glCanvas);
 const cameras = new CameraManager(engine, $('videos'));
 const analyzer = new AudioAnalyzer();
+const autoDirector = new AutoDirector();
+let autoLook = '';
 const previewCtx = ctx2d($<HTMLCanvasElement>('preview'));
 const programCtx = ctx2d($<HTMLCanvasElement>('program'));
 const tiles = new Map<string, { el: HTMLElement; ctx: CanvasRenderingContext2D }>();
@@ -118,6 +122,7 @@ function frame() {
   try {
     engine.signals = analyzer.update(lastFrameAt);
     renderMeters();
+    runAutoDirector(lastFrameAt);
     const out = engine.tick(lastFrameAt);
     if (out) draw(out.preview, out.program);
   } catch (error) {
@@ -428,6 +433,7 @@ function setBeatCut(every: number) {
     toast('Choose an audio input first (top right)');
     every = 0;
   }
+  if (every && autoDirector.enabled) setAutoDirector(false);
   beatEvery = every;
   if (every) lastBeatEvery = every;
   beatCounter = 0;
@@ -439,11 +445,11 @@ beatCutSelect.onchange = () => setBeatCut(Number(beatCutSelect.value));
 
 /** Moves Program's base layer to the next camera that has video, keeping layers and effects. */
 function beatCut() {
-  const withVideo = cameras.sorted().filter((c) => c.online && !engine.isLost(c.info.id));
+  const withVideo = camerasWithVideo();
   if (withVideo.length < 2 || engine.transitioning) return;
   const base = engine.program.layers[0];
-  const index = withVideo.findIndex((c) => c.info.id === base.sourceId);
-  base.sourceId = withVideo[(index + 1) % withVideo.length].info.id;
+  const index = withVideo.indexOf(base.sourceId);
+  base.sourceId = withVideo[(index + 1) % withVideo.length];
   renderMultiview();
   // A full rebuild on every beat would cut off a slider drag in LIVE edit; sync only the source picker.
   if (live) {
@@ -452,11 +458,68 @@ function beatCut() {
   }
 }
 
+function camerasWithVideo(): string[] {
+  return cameras
+    .sorted()
+    .filter((c) => c.online && !engine.isLost(c.info.id))
+    .map((c) => c.info.id);
+}
+
 analyzer.onBeat = () => {
+  autoDirector.onBeat();
   if (!beatEvery) return;
   beatCounter++;
   if (beatCounter % beatEvery === 0) beatCut();
 };
+
+// ---- auto director ------------------------------------------------------------
+
+const autoButton = $('auto-director');
+const autoStyle = $<HTMLSelectElement>('auto-style');
+
+function setAutoDirector(on: boolean) {
+  autoDirector.enabled = on;
+  autoButton.classList.toggle('on', on);
+  if (on) {
+    setBeatCut(0);
+    autoDirector.queueNow();
+  } else {
+    autoLook = '';
+  }
+  renderAutoStatus();
+}
+
+function runAutoDirector(now: number) {
+  const decision = autoDirector.update({
+    cameras: camerasWithVideo(),
+    program: engine.program,
+    signals: engine.signals,
+    audio: analyzer.active,
+    now,
+  });
+  if (!decision) return;
+  autoLook = decision.look;
+  if (decision.transition)
+    engine.transitionTo(decision.scene, decision.transition, decision.seconds);
+  else engine.take(decision.scene);
+  renderAutoStatus();
+}
+
+function renderAutoStatus() {
+  $('auto-status').textContent = autoDirector.enabled
+    ? `${autoLook || 'waiting for a camera'} · next in ${autoDirector.remaining({ audio: analyzer.active, now: performance.now() })} · ${autoDirector.energy}`
+    : '';
+}
+
+/** A shot the director picked by hand gets a full shot length before the auto director moves on. */
+function manual(action: () => void) {
+  action();
+  autoDirector.restart(performance.now());
+}
+
+autoButton.onclick = () => setAutoDirector(!autoDirector.enabled);
+autoStyle.onchange = () => (autoDirector.style = autoStyle.value as AutoStyle);
+setInterval(renderAutoStatus, 250);
 
 // ---- switcher ---------------------------------------------------------------
 
@@ -472,8 +535,8 @@ duration.oninput = () => {
   $('duration-out').textContent = `${Number(duration.value).toFixed(1)} s`;
 };
 
-$('cut').onclick = () => engine.cut();
-$('auto').onclick = () => engine.auto();
+$('cut').onclick = () => manual(() => engine.cut());
+$('auto').onclick = () => manual(() => engine.auto());
 $('live-toggle').onclick = () => setLive(!live);
 
 // ---- scene slots ------------------------------------------------------------
@@ -505,7 +568,7 @@ async function persist() {
 function loadSlot(index: number, target: 'program' | 'preview') {
   const slot = saved.slots[index];
   if (!slot) return toast(`Slot ${index + 1} is empty – shift-click to save the preview there`);
-  if (target === 'program') engine.take(slot);
+  if (target === 'program') manual(() => engine.take(slot));
   else engine.preview = cloneScene(slot);
   renderPanelNow();
   renderMultiview();
@@ -611,10 +674,10 @@ function handleKey(event: KeyboardEvent) {
     if (camera) setPreviewSource(camera.info.id);
   } else if (event.code === 'Space') {
     event.preventDefault();
-    engine.cut();
+    manual(() => engine.cut());
   } else if (event.key === 'Enter') {
     event.preventDefault();
-    engine.auto();
+    manual(() => engine.auto());
   } else if (fKey) {
     event.preventDefault();
     const index = Number(fKey[1]) - 1;
@@ -622,6 +685,8 @@ function handleKey(event: KeyboardEvent) {
     else loadSlot(index, event.altKey ? 'preview' : 'program');
   } else if (event.code === 'KeyL' && !event.altKey) {
     setLive(!live);
+  } else if (event.code === 'KeyD' && !event.altKey) {
+    setAutoDirector(!autoDirector.enabled);
   } else if (event.code === 'KeyB' && !event.altKey) {
     setBeatCut(beatEvery ? 0 : lastBeatEvery);
   }
@@ -646,7 +711,9 @@ function toast(text: string) {
   toastTimer = window.setTimeout(() => (el.hidden = true), 3500);
 }
 
-Object.assign(window, { stagecam: { engine, cameras, analyzer, effectList, transitionList } });
+Object.assign(window, {
+  stagecam: { engine, cameras, analyzer, autoDirector, effectList, transitionList },
+});
 
 renderSlots();
 renderPanelNow();

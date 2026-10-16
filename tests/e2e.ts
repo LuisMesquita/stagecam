@@ -304,6 +304,38 @@ try {
     if (seen.size < 2) throw new Error(`program stayed on ${[...seen]}`);
   });
 
+  await step('the Halloween auto director builds new shots with creepy looks', async () => {
+    await director.selectOption('#auto-style', 'halloween');
+    await director.click('#auto-director');
+    const looks = new Set<string>();
+    const programs = new Set<string>();
+    const deadline = Date.now() + 15_000;
+    while ((looks.size < 2 || programs.size < 2) && Date.now() < deadline) {
+      const state = await director.evaluate(() => {
+        const { engine } = (window as any).stagecam;
+        return {
+          status: document.getElementById('auto-status')!.textContent ?? '',
+          program: engine.program.layers.map((l: any) => l.uid).join(),
+          effects: engine.program.layers[0].effects.map((e: any) => e.type),
+        };
+      });
+      looks.add(state.status.split(' · ')[0]);
+      programs.add(state.program);
+      await director.waitForTimeout(200);
+    }
+    await director.screenshot({ path: join(OUT, 'director-auto.png') });
+    await director.click('#auto-director');
+    if (programs.size < 2) throw new Error('program never changed');
+    const halloween = await director.evaluate(() =>
+      (window as any).stagecam.engine.program.layers[0].effects.every((e: any) =>
+        (window as any).stagecam.effectList
+          .find((d: any) => d.id === e.type)
+          ?.name.startsWith('🎃'),
+      ),
+    );
+    if (!halloween) throw new Error('a non-Halloween effect was used');
+  });
+
   await step('a phone back from the background reconnects by itself', async () => {
     const cam = cams[1];
     const setVisibility = (state: string) =>

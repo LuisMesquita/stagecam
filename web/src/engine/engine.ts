@@ -180,6 +180,12 @@ export class Engine {
     this.#startTransition(this.preview, true);
   }
 
+  /** Transitions Program to a scene with the given transition, leaving Preview untouched. */
+  transitionTo(scene: Scene, transitionId: string, seconds: number): void {
+    if (this.#active) this.#finishTransition();
+    this.#startTransition(cloneScene(scene), false, transitionId, seconds);
+  }
+
   /** Puts a scene straight on Program, leaving Preview untouched. */
   take(scene: Scene): void {
     if (this.#active) this.#finishTransition();
@@ -322,13 +328,18 @@ export class Engine {
     return out;
   }
 
-  #startTransition(to: Scene, swapPreview: boolean): void {
+  #startTransition(
+    to: Scene,
+    swapPreview: boolean,
+    transitionId = this.transitionId,
+    seconds = this.transitionSeconds,
+  ): void {
     this.#active = {
       from: this.program,
       to,
-      transitionId: this.transitionId,
+      transitionId,
       start: performance.now(),
-      duration: Math.max(0.05, this.transitionSeconds),
+      duration: Math.max(0.05, seconds),
       swapPreview,
     };
     this.onChange();
@@ -351,8 +362,7 @@ export class Engine {
     this.onFailSafe(cameras);
     let safe = cloneScene(this.safeScene());
     if (sourcesOf(safe).some((id) => this.isLost(id, now))) safe = newScene(SLATE);
-    this.#startTransition(safe, false);
-    this.#active!.transitionId = 'crossfade';
+    this.#startTransition(safe, false, 'crossfade');
   }
 
   #updateSources(now: number): void {
