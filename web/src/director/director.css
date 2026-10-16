@@ -362,20 +362,21 @@ button.auto {
   display: none;
 }
 
-.tile.on-preview {
-  border-color: var(--preview);
-}
-
-.tile.on-program {
-  border-color: var(--program);
-}
-
 .tile.weak {
   border-color: #a16207;
 }
 
 .tile.weak .state {
   color: #fde047;
+}
+
+/* After .weak, so a struggling camera still shows that it is on Preview or Program. */
+.tile.on-preview {
+  border-color: var(--preview);
+}
+
+.tile.on-program {
+  border-color: var(--program);
 }
 
 .tile.lost {

@@ -199,10 +199,12 @@ export class CameraManager {
         const bytes = entry.bytesReceived as number;
         const last = this.#lastBytes.get(id);
         this.#lastBytes.set(id, { bytes, at: now });
-        const kbps = last && now > last.at ? ((bytes - last.bytes) * 8) / (now - last.at) : 0;
+        // No rate on the first sample of a link (or after a reconnect reset the counter).
+        if (!last || now <= last.at || bytes < last.bytes) return;
+        const kbps = ((bytes - last.bytes) * 8) / (now - last.at);
         camera.stats = {
           fps: Math.round((entry.framesPerSecond as number | undefined) ?? 0),
-          kbps: Math.max(0, Math.round(kbps)),
+          kbps: Math.round(kbps),
           height: (entry.frameHeight as number | undefined) ?? 0,
         };
       });
