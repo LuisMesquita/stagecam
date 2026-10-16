@@ -4,4 +4,4 @@
 used to test face tracking and Halloween effects on a real face.
 
 Source: [Neil Armstrong pose.jpg](https://commons.wikimedia.org/wiki/File:Neil_Armstrong_pose.jpg),
-NASA, public domain. Scaled to 720 px high and padded to 16:9.
+NASA, public domain. Cropped to head and shoulders (16:9) and scaled to 1280×720.

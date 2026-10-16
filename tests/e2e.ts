@@ -35,6 +35,7 @@ const browser = await chromium.launch({
     '--use-fake-device-for-media-stream',
     '--use-fake-ui-for-media-stream',
     '--autoplay-policy=no-user-gesture-required',
+    `--use-file-for-fake-video-capture=${join(ROOT, 'tests', 'fixtures', 'face.y4m')}`,
   ],
 });
 const errors: string[] = [];
@@ -55,7 +56,10 @@ try {
     viewport: { width: 1600, height: 1000 },
   });
   const director = await context.newPage();
-  director.on('console', (m) => m.type() === 'error' && errors.push(`director: ${m.text()}`));
+  // MediaPipe reports its (harmless) TensorFlow Lite setup through console.error.
+  director.on('console', (m) => {
+    if (m.type() === 'error' && !m.text().startsWith('INFO:')) errors.push(`director: ${m.text()}`);
+  });
   director.on('pageerror', (e) => errors.push(`director: ${e.message}`));
   await director.goto(`${DIRECTOR}/director.html?codec=any`);
 
@@ -120,6 +124,61 @@ try {
       engine.onChange();
     });
     await director.waitForTimeout(800);
+    const toast = await director.$eval('#toast', (el) =>
+      (el as HTMLElement).hidden ? '' : el.textContent,
+    );
+    if (toast) throw new Error(toast);
+  });
+
+  await step('face tracking puts a skull mask on the face', async () => {
+    const before = await director.evaluate(() => {
+      const { engine, cameras } = (window as any).stagecam;
+      const id = cameras.byNumber(1).info.id;
+      engine.preview = {
+        layers: [{ uid: 'mask', sourceId: id, blend: 'normal', opacity: 1, effects: [] }],
+      };
+      return id;
+    });
+    const brightness = () =>
+      director.evaluate((id) => {
+        const { faceTracker } = (window as any).stagecam;
+        const [face] = faceTracker.faces(id);
+        const canvas = document.getElementById('preview') as HTMLCanvasElement;
+        // Around the right iris, in monitor pixels (the monitor is half the output size, y down).
+        const x = face ? face.points[468 * 3] / 2 : 320;
+        const y = face ? (720 - face.points[468 * 3 + 1]) / 2 : 120;
+        const data = canvas.getContext('2d')!.getImageData(x - 4, y - 3, 8, 6).data;
+        let sum = 0;
+        for (let i = 0; i < data.length; i += 4) sum += data[i] + data[i + 1] + data[i + 2];
+        return sum / (data.length / 4) / 3;
+      }, before);
+    await director.evaluate(() => {
+      const { engine } = (window as any).stagecam;
+      engine.preview.layers[0].effects = [
+        { uid: 'skull', type: 'skull-mask', enabled: true, params: { shade: 0 } },
+      ];
+    });
+    await director.waitForFunction(
+      (id) => (window as any).stagecam.faceTracker.faces(id).length > 0,
+      before,
+      { timeout: 30_000 },
+    );
+    await director.evaluate(() =>
+      (window as any).stagecam.engine.preview.layers[0].effects.splice(0),
+    );
+    await director.waitForTimeout(300);
+    const plain = await brightness();
+    await director.evaluate(() => {
+      const { engine } = (window as any).stagecam;
+      engine.preview.layers[0].effects = [
+        { uid: 'skull2', type: 'skull-mask', enabled: true, params: { shade: 0 } },
+      ];
+    });
+    await director.waitForTimeout(500);
+    const masked = await brightness();
+    await director.screenshot({ path: join(OUT, 'director-skull.png') });
+    if (plain - masked < 30)
+      throw new Error(`eye brightness ${plain.toFixed(0)} → ${masked.toFixed(0)}`);
     const toast = await director.$eval('#toast', (el) =>
       (el as HTMLElement).hidden ? '' : el.textContent,
     );
@@ -319,21 +378,19 @@ try {
           effects: engine.program.layers[0].effects.map((e: any) => e.type),
         };
       });
-      looks.add(state.status.split(' · ')[0]);
+      const look = state.status.split(' · ')[0];
+      if (look && look !== 'waiting for a camera') looks.add(look);
       programs.add(state.program);
       await director.waitForTimeout(200);
     }
     await director.screenshot({ path: join(OUT, 'director-auto.png') });
     await director.click('#auto-director');
     if (programs.size < 2) throw new Error('program never changed');
-    const halloween = await director.evaluate(() =>
-      (window as any).stagecam.engine.program.layers[0].effects.every((e: any) =>
-        (window as any).stagecam.effectList
-          .find((d: any) => d.id === e.type)
-          ?.name.startsWith('🎃'),
-      ),
+    const halloween: string[] = await director.evaluate(() =>
+      (window as any).stagecam.looks.filter((l: any) => l.halloween).map((l: any) => l.name),
     );
-    if (!halloween) throw new Error('a non-Halloween effect was used');
+    const other = [...looks].filter((name) => name && !halloween.includes(name));
+    if (other.length) throw new Error(`non-Halloween looks used: ${other}`);
   });
 
   await step('a phone back from the background reconnects by itself', async () => {

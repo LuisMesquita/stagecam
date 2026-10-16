@@ -16,6 +16,7 @@
     "gallery": "vp build && node tests/gallery.ts"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "^1.1.1",
     "qrcode": "^1.5.4",
     "selfsigned": "^5.5.0",
     "sirv": "^3.0.2",

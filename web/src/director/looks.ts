@@ -127,4 +127,37 @@ export const LOOKS: Look[] = [
       { type: 'lightning', params: { chance: 0.2 }, mods: { strike: beat(1) } },
     ],
   },
+  {
+    name: 'Pumpkin party',
+    halloween: true,
+    energy: ['mid', 'wild'],
+    effects: [
+      { type: 'pumpkin-head', mods: { glow: beat(0.4) } },
+      { type: 'old-horror-film', params: { sepia: 0.3, scratches: 0.3 } },
+    ],
+  },
+  {
+    name: 'Skull crew',
+    halloween: true,
+    energy: ['calm', 'mid'],
+    effects: [
+      { type: 'skull-mask' },
+      { type: 'bw-contrast', params: { contrast: 1.8, grain: 0.12 } },
+    ],
+  },
+  {
+    name: 'Demonic',
+    halloween: true,
+    energy: ['mid', 'wild'],
+    effects: [
+      { type: 'demon-mask', mods: { eyes: beat(0.4) } },
+      { type: 'blood-moon', params: { intensity: 0.45 }, mods: { pulse: beat(0.5) } },
+    ],
+  },
+  {
+    name: 'Watching you',
+    halloween: true,
+    energy: ['calm', 'mid'],
+    effects: [{ type: 'night-vision' }, { type: 'glowing-eyes', params: { hue: 0.33 } }],
+  },
 ];
