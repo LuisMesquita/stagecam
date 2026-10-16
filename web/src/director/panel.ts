@@ -220,6 +220,8 @@ function slider(
     input.value = String(param.default);
     input.dispatchEvent(new Event('input'));
   };
+  const row = h('label', { className: 'slider' }, h('span', {}, param.label), input, readout);
+  if (param.linkable === false) return row;
   const mod = modAccess.get();
   const link = h('button', {
     className: mod ? 'icon audio-link on' : 'icon audio-link',
@@ -230,7 +232,7 @@ function slider(
       onStructure();
     },
   });
-  const row = h('label', { className: 'slider' }, h('span', {}, param.label), input, readout, link);
+  row.append(link);
   if (!mod) return row;
   return h('div', { className: 'slider-group' }, row, modRow(mod, modAccess, ctx));
 }

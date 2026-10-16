@@ -7,7 +7,7 @@ export default {
   params: [
     { key: 'split', label: 'RGB split', min: 0, max: 0.05, step: 0.001, default: 0.012 },
     { key: 'glitch', label: 'Glitch', min: 0, max: 1, step: 0.01, default: 0.35 },
-    { key: 'speed', label: 'Speed', min: 0.1, max: 4, step: 0.01, default: 1 },
+    { key: 'speed', label: 'Speed', min: 0.1, max: 4, step: 0.01, default: 1, linkable: false },
   ],
   glsl: `
 vec4 effect(vec2 uv) {

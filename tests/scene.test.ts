@@ -39,6 +39,11 @@ describe('modulate', () => {
     expect(modulate(1, param, { signal: 'level', amount: -1 }, signals)).toBe(0);
   });
 
+  it('ignores links on params that are not linkable', () => {
+    const spin = { key: 'spin', label: 'Spin', min: -2, max: 2, default: 0.2, linkable: false };
+    expect(modulate(0.2, spin, { signal: 'level', amount: 1 }, signals)).toBe(0.2);
+  });
+
   it('rounds stepped params', () => {
     const segments = { key: 'segments', label: 'Segments', min: 2, max: 16, step: 1, default: 6 };
     expect(modulate(6, segments, { signal: 'bass', amount: 0.25 }, signals)).toBe(8);

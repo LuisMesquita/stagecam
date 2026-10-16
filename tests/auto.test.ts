@@ -39,6 +39,10 @@ describe('looks', () => {
       for (const key of [...Object.keys(spec.params ?? {}), ...Object.keys(spec.mods ?? {})]) {
         expect(keys, `${spec.type}.${key}`).toContain(key);
       }
+      for (const key of Object.keys(spec.mods ?? {})) {
+        const param = def!.params.find((p) => p.key === key);
+        expect(param?.linkable, `${spec.type}.${key} is not linkable`).not.toBe(false);
+      }
     }
   });
 

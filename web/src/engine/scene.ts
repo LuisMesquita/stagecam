@@ -96,7 +96,7 @@ export function modulate(
   mod: AudioMod | undefined,
   signals: Signals,
 ): number {
-  if (!mod || mod.amount === 0) return base;
+  if (!mod || mod.amount === 0 || param.linkable === false) return base;
   const value = base + mod.amount * (param.max - param.min) * signals[mod.signal];
   const clamped = Math.min(param.max, Math.max(param.min, value));
   return param.step === 1 ? Math.round(clamped) : clamped;

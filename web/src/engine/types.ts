@@ -8,6 +8,8 @@ export interface ParamDef {
   max: number;
   step?: number;
   default: number;
+  /** False for rates a shader multiplies by u_time (spin, speed): an audio link would make them jump. */
+  linkable?: boolean;
 }
 
 export interface FrameContext {
