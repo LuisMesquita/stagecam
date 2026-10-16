@@ -1,6 +1,14 @@
 import { effectList, effects } from '../engine/registry.ts';
-import { newEffect, newLayer } from '../engine/scene.ts';
-import type { BlendMode, EffectInstance, Layer, Scene } from '../engine/scene.ts';
+import { OPACITY_PARAM, SIGNALS, modulate, newEffect, newLayer } from '../engine/scene.ts';
+import type {
+  AudioMod,
+  BlendMode,
+  EffectInstance,
+  Layer,
+  Scene,
+  SignalName,
+  Signals,
+} from '../engine/scene.ts';
 import { BLEND_MODES } from '../engine/shaders.ts';
 import type { ParamDef } from '../engine/types.ts';
 import { h, select } from './dom.ts';
@@ -10,20 +18,36 @@ export interface PanelOptions {
   outputFx: EffectInstance[];
   live: boolean;
   sources: { value: string; label: string }[];
-  /** Called after a structural edit (add/remove/reorder) so the panel can be rebuilt. */
+  /** Current audio signals, read when live readouts refresh. */
+  signals: () => Signals;
+  /** Called after a structural edit (add/remove/reorder/audio link) so the panel can be rebuilt. */
   onStructure: () => void;
 }
 
-/** Editor for the bus being edited. Sliders mutate the scene in place, so changes show on the next frame. */
-export function renderPanel(root: HTMLElement, options: PanelOptions): void {
+interface ModAccess {
+  get(): AudioMod | undefined;
+  set(mod: AudioMod | undefined): void;
+}
+
+interface Context {
+  options: PanelOptions;
+  refreshers: (() => void)[];
+}
+
+/**
+ * Editor for the bus being edited. Sliders mutate the scene in place, so changes show on the next
+ * frame. Returns a function that refreshes the live (audio-modulated) readouts.
+ */
+export function renderPanel(root: HTMLElement, options: PanelOptions): () => void {
   const { scene, outputFx, live, onStructure } = options;
+  const ctx: Context = { options, refreshers: [] };
   root.replaceChildren(
     h(
       'h2',
       { className: live ? 'panel-title live' : 'panel-title' },
       live ? 'Editing PROGRAM (live)' : 'Editing PREVIEW',
     ),
-    ...scene.layers.map((layer, index) => layerCard(scene, layer, index, options)),
+    ...scene.layers.map((layer, index) => layerCard(scene, layer, index, ctx)),
     h('button', {
       className: 'ghost wide',
       textContent: '+ Add layer (superimpose)',
@@ -44,19 +68,20 @@ export function renderPanel(root: HTMLElement, options: PanelOptions): void {
         h('strong', {}, 'Output FX'),
         h('small', {}, 'on top of everything'),
       ),
-      effectChain(outputFx, onStructure),
+      effectChain(outputFx, ctx),
     ),
   );
+  return () => ctx.refreshers.forEach((refresh) => refresh());
 }
 
-function layerCard(scene: Scene, layer: Layer, index: number, options: PanelOptions): HTMLElement {
-  const { onStructure } = options;
+function layerCard(scene: Scene, layer: Layer, index: number, ctx: Context): HTMLElement {
+  const { onStructure, sources } = ctx.options;
   const base = index === 0;
   const head = h(
     'header',
     { className: 'card-head' },
     h('strong', {}, base ? 'Base layer' : `Layer ${index + 1}`),
-    select(options.sources, layer.sourceId, (value) => {
+    select(sources, layer.sourceId, (value) => {
       layer.sourceId = value;
       onStructure();
     }),
@@ -88,21 +113,17 @@ function layerCard(scene: Scene, layer: Layer, index: number, options: PanelOpti
         ),
       );
   const opacity = slider(
-    { key: 'opacity', label: 'Opacity', min: 0, max: 1, step: 0.01, default: 1 },
+    OPACITY_PARAM,
     () => layer.opacity,
     (value) => (layer.opacity = value),
+    { get: () => layer.opacityMod, set: (mod) => (layer.opacityMod = mod) },
+    ctx,
   );
-  return h(
-    'section',
-    { className: 'card' },
-    head,
-    blend,
-    opacity,
-    effectChain(layer.effects, onStructure),
-  );
+  return h('section', { className: 'card' }, head, blend, opacity, effectChain(layer.effects, ctx));
 }
 
-function effectChain(list: EffectInstance[], onStructure: () => void): HTMLElement {
+function effectChain(list: EffectInstance[], ctx: Context): HTMLElement {
+  const { onStructure } = ctx.options;
   const container = h('div', { className: 'effects' });
   list.forEach((instance, index) => {
     const def = effects.get(instance.type);
@@ -137,6 +158,16 @@ function effectChain(list: EffectInstance[], onStructure: () => void): HTMLEleme
             param,
             () => instance.params[param.key] ?? param.default,
             (value) => (instance.params[param.key] = value),
+            {
+              get: () => instance.mods?.[param.key],
+              set: (mod) => {
+                const mods = { ...instance.mods };
+                if (mod) mods[param.key] = mod;
+                else delete mods[param.key];
+                instance.mods = Object.keys(mods).length ? mods : undefined;
+              },
+            },
+            ctx,
           ),
         ),
       ),
@@ -160,7 +191,14 @@ function effectChain(list: EffectInstance[], onStructure: () => void): HTMLEleme
   return container;
 }
 
-function slider(param: ParamDef, get: () => number, set: (value: number) => void): HTMLElement {
+function slider(
+  param: ParamDef,
+  get: () => number,
+  set: (value: number) => void,
+  modAccess: ModAccess,
+  ctx: Context,
+): HTMLElement {
+  const { onStructure, signals } = ctx.options;
   const input = h('input', {
     type: 'range',
     min: String(param.min),
@@ -170,15 +208,56 @@ function slider(param: ParamDef, get: () => number, set: (value: number) => void
     title: 'Double-click to reset',
   });
   const readout = h('output', {}, format(get()));
+  const refresh = () => {
+    readout.textContent = format(modulate(get(), param, modAccess.get(), signals()));
+  };
+  ctx.refreshers.push(refresh);
   input.oninput = () => {
     set(Number(input.value));
-    readout.textContent = format(Number(input.value));
+    refresh();
   };
   input.ondblclick = () => {
     input.value = String(param.default);
     input.dispatchEvent(new Event('input'));
   };
-  return h('label', { className: 'slider' }, h('span', {}, param.label), input, readout);
+  const mod = modAccess.get();
+  const link = h('button', {
+    className: mod ? 'icon audio-link on' : 'icon audio-link',
+    textContent: '♪',
+    title: mod ? 'Remove the audio link' : 'Make this slider follow the music',
+    onclick: () => {
+      modAccess.set(mod ? undefined : { signal: 'beat', amount: 0.5 });
+      onStructure();
+    },
+  });
+  const row = h('label', { className: 'slider' }, h('span', {}, param.label), input, readout, link);
+  if (!mod) return row;
+  return h('div', { className: 'slider-group' }, row, modRow(mod, modAccess, ctx));
+}
+
+function modRow(mod: AudioMod, modAccess: ModAccess, ctx: Context): HTMLElement {
+  const amount = h('input', {
+    type: 'range',
+    min: '-1',
+    max: '1',
+    step: '0.05',
+    value: String(mod.amount),
+    title: 'How far the music pushes the slider (negative pulls it down)',
+  });
+  const percent = h('output', {}, `${Math.round(mod.amount * 100)}%`);
+  amount.oninput = () => {
+    mod.amount = Number(amount.value);
+    percent.textContent = `${Math.round(mod.amount * 100)}%`;
+  };
+  const signal = select(
+    SIGNALS.map((name) => ({ value: name, label: name })),
+    mod.signal,
+    (value: SignalName) => {
+      modAccess.set({ ...mod, signal: value });
+      ctx.options.onStructure();
+    },
+  );
+  return h('div', { className: 'mod-row' }, h('span', {}, '♪ follows'), signal, amount, percent);
 }
 
 function iconButton(

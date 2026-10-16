@@ -230,6 +230,107 @@ try {
     },
   );
 
+  await step('tiles show link stats', async () => {
+    await director.waitForFunction(
+      () =>
+        [...document.querySelectorAll('.tile .state')].every((el) =>
+          el.textContent?.includes('fps'),
+        ),
+      undefined,
+      { timeout: 5000 },
+    );
+  });
+
+  await step('a microphone drives the meters and the beat detector', async () => {
+    const options = await director.$$eval('#audio-input option', (els) =>
+      els.map((o) => (o as HTMLOptionElement).value),
+    );
+    await director.selectOption(
+      '#audio-input',
+      options.find((v) => v && v !== 'display')!,
+    );
+    await director.waitForFunction(() => (window as any).stagecam.analyzer.active, undefined, {
+      timeout: 5000,
+    });
+    await director.waitForFunction(
+      () => (window as any).stagecam.engine.signals.level > 0.05,
+      undefined,
+      { timeout: 5000 },
+    );
+    await director.waitForFunction(
+      () => (window as any).stagecam.analyzer.beats.count >= 2,
+      undefined,
+      { timeout: 10_000 },
+    );
+  });
+
+  await step('a ♪-linked slider shows a live value away from its resting value', async () => {
+    await director.evaluate(() => {
+      const { engine } = (window as any).stagecam;
+      engine.preview.layers[0].effects = [
+        {
+          uid: 'sat',
+          type: 'oversaturate',
+          enabled: true,
+          params: { amount: 0.5, contrast: 1 },
+          mods: { amount: { signal: 'level', amount: 1 } },
+        },
+      ];
+      engine.onChange();
+    });
+    await director.waitForSelector('button.audio-link.on');
+    await director.screenshot({ path: join(OUT, 'director-audio.png') });
+    await director.waitForFunction(
+      () => {
+        const out = document.querySelector('.effect .slider output');
+        return out !== null && Number(out.textContent) > 0.6;
+      },
+      undefined,
+      { timeout: 5000 },
+    );
+  });
+
+  await step('beat cut switches program between cameras on the beat', async () => {
+    await director.selectOption('#beat-cut', '1');
+    const seen = new Set<string>();
+    const deadline = Date.now() + 10_000;
+    while (seen.size < 2 && Date.now() < deadline) {
+      seen.add(
+        await director.evaluate(() => (window as any).stagecam.engine.program.layers[0].sourceId),
+      );
+      await director.waitForTimeout(100);
+    }
+    await director.selectOption('#beat-cut', '0');
+    if (seen.size < 2) throw new Error(`program stayed on ${[...seen]}`);
+  });
+
+  await step('a phone back from the background reconnects by itself', async () => {
+    const cam = cams[1];
+    const setVisibility = (state: string) =>
+      cam.evaluate((value) => {
+        Object.defineProperty(document, 'visibilityState', { value, configurable: true });
+        document.dispatchEvent(new Event('visibilitychange'));
+      }, state);
+    await setVisibility('hidden');
+    await cam.waitForTimeout(2500);
+    await setVisibility('visible');
+    await cam.waitForFunction(
+      () => document.getElementById('status')!.textContent === 'Live link OK',
+      undefined,
+      {
+        timeout: 15_000,
+      },
+    );
+    const back = await director.evaluate(() =>
+      [...(window as any).stagecam.cameras.cameras.values()].every(
+        (c: any) => c.online && c.link === 'connected',
+      ),
+    );
+    if (!back) throw new Error('director did not see the camera reconnect');
+    const awake = await cam.$eval('#awake', (el) => el.textContent);
+    if (!awake) throw new Error('wake-lock pill missing');
+  });
+
   await step('losing one of two cameras on program keeps the shot on air', async () => {
     await director.evaluate(() => {
       const { cameras, engine } = (window as any).stagecam;

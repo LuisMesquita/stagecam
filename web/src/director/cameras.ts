@@ -2,8 +2,15 @@ import type { Engine } from '../engine/engine.ts';
 import type { CameraInfo, ServerMsg, SignalData } from '../shared/protocol.ts';
 import type { Signal } from '../shared/signal.ts';
 
+export interface LinkStats {
+  fps: number;
+  kbps: number;
+  height: number;
+}
+
 export interface Camera {
   info: CameraInfo;
+  stats: LinkStats | null;
   number: number;
   online: boolean;
   link: RTCPeerConnectionState | 'waiting';
@@ -13,6 +20,7 @@ export interface Camera {
 }
 
 const NUMBERS_KEY = 'stagecam.cameraNumbers';
+const STATS_INTERVAL_MS = 1000;
 
 /** Receives one WebRTC stream per phone and feeds it to the engine. */
 export class CameraManager {
@@ -34,6 +42,7 @@ export class CameraManager {
     } catch {
       this.#numbers = {};
     }
+    setInterval(() => void this.#pollStats(), STATS_INTERVAL_MS);
   }
 
   attach(signal: Signal): void {
@@ -110,6 +119,7 @@ export class CameraManager {
       this.#videoHost.append(video);
       camera = {
         info,
+        stats: null,
         number: this.#assignNumber(info.id),
         online: true,
         link: 'waiting',
@@ -126,6 +136,7 @@ export class CameraManager {
 
   #goOffline(camera: Camera): void {
     camera.online = false;
+    camera.stats = null;
     camera.link = 'waiting';
     camera.pc?.close();
     camera.pc = null;
@@ -169,6 +180,33 @@ export class CameraManager {
     camera.pending = [];
     await pc.setLocalDescription(await pc.createAnswer());
     this.#signal?.send({ t: 'signal', to: id, data: { sdp: pc.localDescription!.toJSON() } });
+  }
+
+  #lastBytes = new Map<string, { bytes: number; at: number }>();
+
+  async #pollStats(): Promise<void> {
+    for (const camera of this.cameras.values()) {
+      const pc = camera.pc;
+      if (!pc || pc.connectionState !== 'connected') {
+        camera.stats = null;
+        continue;
+      }
+      const report = await pc.getStats();
+      report.forEach((entry) => {
+        if (entry.type !== 'inbound-rtp' || entry.kind !== 'video') return;
+        const id = camera.info.id;
+        const now = entry.timestamp as number;
+        const bytes = entry.bytesReceived as number;
+        const last = this.#lastBytes.get(id);
+        this.#lastBytes.set(id, { bytes, at: now });
+        const kbps = last && now > last.at ? ((bytes - last.bytes) * 8) / (now - last.at) : 0;
+        camera.stats = {
+          fps: Math.round((entry.framesPerSecond as number | undefined) ?? 0),
+          kbps: Math.max(0, Math.round(kbps)),
+          height: (entry.frameHeight as number | undefined) ?? 0,
+        };
+      });
+    }
   }
 
   #assignNumber(id: string): number {

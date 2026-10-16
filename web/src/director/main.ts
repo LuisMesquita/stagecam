@@ -3,10 +3,19 @@ import { Engine } from '../engine/engine.ts';
 import { HEIGHT, WIDTH } from '../engine/gl.ts';
 import type { Target } from '../engine/gl.ts';
 import { effectList, transitionList } from '../engine/registry.ts';
-import { BLACK, SLATE, cloneEffects, cloneScene, newScene, sourcesOf } from '../engine/scene.ts';
+import {
+  BLACK,
+  SIGNALS,
+  SLATE,
+  cloneEffects,
+  cloneScene,
+  newScene,
+  sourcesOf,
+} from '../engine/scene.ts';
 import type { EffectInstance, Scene } from '../engine/scene.ts';
 import type { Tally } from '../shared/protocol.ts';
 import { Signal } from '../shared/signal.ts';
+import { AudioAnalyzer, MUSIC_ON_MAC, listMics } from './audio.ts';
 import { CameraManager } from './cameras.ts';
 import type { Camera } from './cameras.ts';
 import { h } from './dom.ts';
@@ -14,6 +23,8 @@ import { renderPanel } from './panel.ts';
 
 const SLOT_COUNT = 9;
 const ROTATIONS_KEY = 'stagecam.rotations';
+const AUDIO_KEY = 'stagecam.audioInput';
+const SENSITIVITY_KEY = 'stagecam.sensitivity';
 const MONITOR = { w: 640, h: 360 };
 const TILE = { w: 320, h: 180 };
 
@@ -29,6 +40,7 @@ const ctx2d = (canvas: HTMLCanvasElement) => canvas.getContext('2d', { alpha: fa
 const glCanvas = document.createElement('canvas');
 const engine = new Engine(glCanvas);
 const cameras = new CameraManager(engine, $('videos'));
+const analyzer = new AudioAnalyzer();
 const previewCtx = ctx2d($<HTMLCanvasElement>('preview'));
 const programCtx = ctx2d($<HTMLCanvasElement>('program'));
 const tiles = new Map<string, { el: HTMLElement; ctx: CanvasRenderingContext2D }>();
@@ -38,6 +50,7 @@ let saved: SavedState = { slots: Array(SLOT_COUNT).fill(null), safe: 'slate' };
 let outputWindow: Window | null = null;
 let outputCtx: CanvasRenderingContext2D | null = null;
 const sentTally = new Map<string, Tally>();
+let refreshPanel = () => {};
 
 // ---- signaling --------------------------------------------------------------
 
@@ -103,6 +116,8 @@ setInterval(() => {
 function frame() {
   lastFrameAt = performance.now();
   try {
+    engine.signals = analyzer.update(lastFrameAt);
+    renderMeters();
     const out = engine.tick(lastFrameAt);
     if (out) draw(out.preview, out.program);
   } catch (error) {
@@ -215,16 +230,21 @@ function updateTile(camera: Camera, el: HTMLElement) {
   const lost = !camera.online || engine.isLost(id);
   el.querySelector('.num')!.textContent = String(camera.number);
   el.querySelector('.name')!.textContent = camera.info.name;
+  const stats = camera.stats;
+  const weak = !lost && !!stats && (stats.fps < 20 || stats.kbps < 600);
   el.querySelector('.state')!.textContent = !camera.online
     ? 'offline'
     : camera.link === 'connected'
       ? lost
         ? 'no video'
-        : ''
+        : stats
+          ? `${stats.fps} fps · ${(stats.kbps / 1000).toFixed(1)} Mb · ${stats.height}p`
+          : ''
       : camera.link === 'waiting'
         ? 'joining…'
         : camera.link;
   el.classList.toggle('lost', lost);
+  el.classList.toggle('weak', weak);
   el.classList.toggle(
     'on-program',
     engine.onAir.some((scene) => sourcesOf(scene).includes(id)),
@@ -293,11 +313,12 @@ function renderPanelNow() {
     if (!sources.some((s) => s.value === layer.sourceId))
       sources.unshift({ value: layer.sourceId, label: 'Missing camera' });
   }
-  renderPanel($('panel'), {
+  refreshPanel = renderPanel($('panel'), {
     scene,
     outputFx: engine.outputFx,
     live,
     sources,
+    signals: () => engine.signals,
     onStructure: () => {
       renderPanelNow();
       renderMultiview();
@@ -314,6 +335,119 @@ function setLive(value: boolean) {
   document.body.classList.toggle('live-mode', live);
   renderPanelNow();
 }
+
+setInterval(() => refreshPanel(), 100);
+
+// ---- audio ------------------------------------------------------------------
+
+const audioSelect = $<HTMLSelectElement>('audio-input');
+const sensitivity = $<HTMLInputElement>('sensitivity');
+const meterBars = SIGNALS.map((name) => {
+  const bar = h('i');
+  $('meters').append(h('span', { className: `meter ${name}`, title: name }, bar));
+  return bar;
+});
+
+function renderMeters() {
+  SIGNALS.forEach((name, i) => {
+    meterBars[i].style.transform = `scaleY(${engine.signals[name]})`;
+  });
+}
+
+async function renderAudioInputs() {
+  const mics = await listMics().catch(() => []);
+  const current = audioSelect.value;
+  audioSelect.replaceChildren(
+    h('option', { value: '', textContent: '♪ Audio off' }),
+    h('option', {
+      value: MUSIC_ON_MAC,
+      textContent: '♪ Music playing on this Mac (tab or screen)',
+    }),
+    ...mics.map((mic) => h('option', { value: mic.id, textContent: `🎤 ${mic.label}` })),
+  );
+  audioSelect.value = [...audioSelect.options].some((o) => o.value === current) ? current : '';
+}
+
+async function startAudio(input: string) {
+  if (!input) {
+    analyzer.stop();
+    setBeatCut(0);
+    localStorage.removeItem(AUDIO_KEY);
+    return;
+  }
+  try {
+    await analyzer.start(input);
+    if (input !== MUSIC_ON_MAC) localStorage.setItem(AUDIO_KEY, input);
+    else toast('Capturing music – keep the shared tab or screen open');
+    await renderAudioInputs();
+    audioSelect.value = input;
+  } catch (error) {
+    audioSelect.value = '';
+    const name = error instanceof DOMException ? error.name : '';
+    if (name !== 'NotAllowedError' && name !== 'AbortError')
+      toast(String(error instanceof Error ? error.message : error));
+  }
+}
+
+audioSelect.onchange = () => void startAudio(audioSelect.value);
+analyzer.onEnded = () => {
+  audioSelect.value = '';
+  setBeatCut(0);
+  toast('Audio input stopped');
+};
+sensitivity.value = localStorage.getItem(SENSITIVITY_KEY) ?? sensitivity.value;
+analyzer.gain = Number(sensitivity.value);
+sensitivity.oninput = () => {
+  analyzer.gain = Number(sensitivity.value);
+  localStorage.setItem(SENSITIVITY_KEY, sensitivity.value);
+};
+navigator.mediaDevices.addEventListener('devicechange', () => void renderAudioInputs());
+document.addEventListener('pointerdown', () => analyzer.resume());
+
+async function restoreAudio() {
+  await renderAudioInputs();
+  const savedMic = localStorage.getItem(AUDIO_KEY);
+  if (savedMic && [...audioSelect.options].some((o) => o.value === savedMic))
+    await startAudio(savedMic);
+}
+
+// ---- beat cut -----------------------------------------------------------------
+
+const beatCutSelect = $<HTMLSelectElement>('beat-cut');
+let beatEvery = 0;
+let lastBeatEvery = 4;
+let beatCounter = 0;
+
+function setBeatCut(every: number) {
+  if (every && !analyzer.active) {
+    toast('Choose an audio input first (top right)');
+    every = 0;
+  }
+  beatEvery = every;
+  if (every) lastBeatEvery = every;
+  beatCounter = 0;
+  beatCutSelect.value = String(every);
+  beatCutSelect.closest('label')!.classList.toggle('on', every > 0);
+}
+
+beatCutSelect.onchange = () => setBeatCut(Number(beatCutSelect.value));
+
+/** Moves Program's base layer to the next camera that has video, keeping layers and effects. */
+function beatCut() {
+  const withVideo = cameras.sorted().filter((c) => c.online && !engine.isLost(c.info.id));
+  if (withVideo.length < 2 || engine.transitioning) return;
+  const base = engine.program.layers[0];
+  const index = withVideo.findIndex((c) => c.info.id === base.sourceId);
+  base.sourceId = withVideo[(index + 1) % withVideo.length].info.id;
+  renderMultiview();
+  if (live) renderPanelNow();
+}
+
+analyzer.onBeat = () => {
+  if (!beatEvery) return;
+  beatCounter++;
+  if (beatCounter % beatEvery === 0) beatCut();
+};
 
 // ---- switcher ---------------------------------------------------------------
 
@@ -479,6 +613,8 @@ function handleKey(event: KeyboardEvent) {
     else loadSlot(index, event.altKey ? 'preview' : 'program');
   } else if (event.code === 'KeyL' && !event.altKey) {
     setLive(!live);
+  } else if (event.code === 'KeyB' && !event.altKey) {
+    setBeatCut(beatEvery ? 0 : lastBeatEvery);
   }
 }
 
@@ -501,11 +637,12 @@ function toast(text: string) {
   toastTimer = window.setTimeout(() => (el.hidden = true), 3500);
 }
 
-Object.assign(window, { stagecam: { engine, cameras, effectList, transitionList } });
+Object.assign(window, { stagecam: { engine, cameras, analyzer, effectList, transitionList } });
 
 renderSlots();
 renderPanelNow();
 renderMultiview();
 void loadSaved();
+void restoreAudio();
 signal.connect();
 schedule();

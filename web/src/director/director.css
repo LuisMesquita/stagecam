@@ -124,6 +124,63 @@ select {
   flex: 1;
 }
 
+.audio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.audio select {
+  max-width: 220px;
+}
+
+.sensitivity input {
+  width: 70px;
+  accent-color: var(--accent);
+}
+
+.meters {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 26px;
+}
+
+.meter {
+  width: 7px;
+  height: 100%;
+  background: var(--surface-2);
+  border-radius: 2px;
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+}
+
+.meter i {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--preview);
+  transform-origin: bottom;
+  transform: scaleY(0);
+}
+
+.meter.beat i {
+  background: var(--accent);
+}
+
+.beat-cut {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.beat-cut.on select {
+  border-color: var(--accent);
+  color: var(--fg);
+}
+
 .toggle.on {
   background: var(--program);
   border-color: var(--program);
@@ -289,9 +346,20 @@ button.auto {
   font-size: 15px;
 }
 
+.tile figcaption {
+  flex-wrap: wrap;
+}
+
 .tile .state {
+  order: 1;
+  flex-basis: 100%;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+}
+
+.tile .state:empty {
+  display: none;
 }
 
 .tile.on-preview {
@@ -300,6 +368,14 @@ button.auto {
 
 .tile.on-program {
   border-color: var(--program);
+}
+
+.tile.weak {
+  border-color: #a16207;
+}
+
+.tile.weak .state {
+  color: #fde047;
 }
 
 .tile.lost {
@@ -444,7 +520,7 @@ h2 small {
 
 .slider {
   display: grid;
-  grid-template-columns: 1fr 1.4fr 40px;
+  grid-template-columns: 1fr 1.4fr 40px 24px;
   align-items: center;
   gap: 8px;
   color: var(--muted);
@@ -454,6 +530,43 @@ h2 small {
 .slider input {
   width: 100%;
   accent-color: var(--accent);
+}
+
+.slider-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mod-row {
+  display: grid;
+  grid-template-columns: auto 1fr 1fr 40px;
+  align-items: center;
+  gap: 6px;
+  padding-left: 10px;
+  font-size: 12px;
+  color: var(--accent);
+}
+
+.mod-row input {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.mod-row output {
+  text-align: right;
+  font-family: ui-monospace, monospace;
+}
+
+button.audio-link {
+  color: var(--muted);
+  padding: 0 5px;
+}
+
+button.audio-link.on {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .slider output {

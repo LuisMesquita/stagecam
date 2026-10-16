@@ -32,6 +32,7 @@ Everything runs on your Mac over your home Wi-Fi. No app to install, no internet
 | `Option` + `F1`–`F9` | Load a slot into Preview for editing (or option-click it)                                       |
 | `Shift` + `F1`–`F9`  | Save Preview to a slot (or shift-click a slot button)                                           |
 | `L`                  | LIVE edit: the panel edits Program instead of Preview                                           |
+| `B`                  | Beat cut on/off                                                                                 |
 
 - **Layers:** each scene is a stack of layers. Each layer has a source, an effect chain, a blend mode
   and an opacity. Click **+ Add layer** to superimpose a second camera.
@@ -44,6 +45,33 @@ Everything runs on your Mac over your home Wi-Fi. No app to install, no internet
   Click ↻ on the camera's tile to rotate it. The director remembers the rotation per phone.
 - **Phones:** a phone shows a red **ON AIR** frame while it is on Program and a green frame while it is on Preview.
 - **Tiles:** double-click a tile's name to rename the camera. Use × to remove it.
+
+## Music and beats
+
+Pick an input in the top bar. The meters next to it show the five signals:
+`bass`, `mid`, `high`, `level` and `beat` (a pulse on each kick drum).
+
+- **Music playing on this Mac:** choose _Music playing on this Mac (tab or screen)_, then:
+  - **YouTube or Spotify Web in a Chrome tab:** share that tab and tick **Also share tab audio**.
+  - **The Spotify app or anything else:** share **Entire screen** and tick **Also share system audio** (macOS 14.2+).
+  - The music keeps playing while it is captured. If you stop sharing, the audio input turns off.
+- **Microphones** (built-in or a USB interface from the mixer) are listed with 🎤.
+  The director remembers the last one you used.
+- **Sensitivity:** use the small slider next to the picker. Turn it up if the meters barely move.
+- **♪ links:** click ♪ next to any slider to make it follow a signal. _amount_ sets how far the music
+  pushes the slider (negative pulls it down). The slider stays at its resting value, and the number
+  shows the live value. Links are saved with scene slots.
+- **Beat cut:** switches Program to the next camera with video every 1, 2, 4 or 8 beats.
+  Layers and effects stay. Press `B` to turn it on and off.
+
+## Camera health
+
+- **Tiles:** each tile shows frame rate, bitrate and resolution. A yellow tile means the phone is
+  struggling (below 20 fps or 0.6 Mb/s), often because it is hot or far from the router.
+- **Phones:** each phone shows **☀ Screen stays on** when it can keep its screen awake, or
+  **⚠ Keep the screen on** when it can't (older iOS or Low Power Mode).
+- **Reconnects:** if a phone was locked or left Safari for a moment, it reconnects by itself as soon as
+  the page is visible again.
 
 ## Adding an effect
 

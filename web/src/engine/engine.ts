@@ -1,8 +1,17 @@
 import { Gpu, HEIGHT, WIDTH } from './gl.ts';
 import type { Target } from './gl.ts';
 import { effects, transitions } from './registry.ts';
-import { BLACK, SLATE, cloneScene, newScene, sourcesOf } from './scene.ts';
-import type { EffectInstance, Scene } from './scene.ts';
+import {
+  BLACK,
+  OPACITY_PARAM,
+  SILENCE,
+  SLATE,
+  cloneScene,
+  modulate,
+  newScene,
+  sourcesOf,
+} from './scene.ts';
+import type { EffectInstance, Scene, Signals } from './scene.ts';
 import { BLEND, BLEND_MODES, NORMALIZE, effectSource, transitionSource } from './shaders.ts';
 import type { EffectRuntime, FrameContext } from './types.ts';
 
@@ -45,6 +54,8 @@ export class Engine {
   outputFx: EffectInstance[] = [];
   transitionId = 'crossfade';
   transitionSeconds = 0.8;
+  /** Current audio signals; the director updates them before each tick. */
+  signals: Signals = { ...SILENCE };
   /** Provides the scene to fall back to when a Program source is lost. */
   safeScene: () => Scene = () => newScene(SLATE);
   onChange: () => void = () => {};
@@ -230,7 +241,7 @@ export class Engine {
       gpu.draw(BLEND, out, {
         u_base: { tex: acc.tex },
         u_layer: { tex: layerOut.tex },
-        u_opacity: layer.opacity,
+        u_opacity: modulate(layer.opacity, OPACITY_PARAM, layer.opacityMod, this.signals),
         u_mode: Math.max(0, BLEND_MODES.indexOf(layer.blend)),
       });
       acc = out;
@@ -250,7 +261,14 @@ export class Engine {
       const def = effects.get(instance.type);
       if (!def || this.#failedShaders.has(def.id)) continue;
       const params: Record<string, number> = {};
-      for (const p of def.params) params[p.key] = instance.params[p.key] ?? p.default;
+      for (const p of def.params) {
+        params[p.key] = modulate(
+          instance.params[p.key] ?? p.default,
+          p,
+          instance.mods?.[p.key],
+          this.signals,
+        );
+      }
       try {
         if (def.kind === 'shader') {
           const out = this.gpu.alloc();
