@@ -13,6 +13,7 @@ const setupError = $('setup-error');
 const video = $<HTMLVideoElement>('preview');
 const me = $('me');
 const statusEl = $('status');
+const awakeEl = $('awake');
 const tallyEl = $('tally');
 const overlay = $('overlay');
 const facingButtons = [...document.querySelectorAll<HTMLButtonElement>('[data-facing]')];
@@ -28,6 +29,9 @@ let sender: RTCRtpSender | null = null;
 let pendingCandidates: RTCIceCandidateInit[] = [];
 let directorPresent = false;
 let wakeLock: WakeLockSentinel | null = null;
+let hiddenAt = 0;
+/** iOS suspends background pages; after this long the socket and camera are likely dead. */
+const RESUME_AFTER_MS = 2000;
 
 nameInput.value = name;
 renderFacing();
@@ -69,9 +73,18 @@ $('flip').addEventListener('click', async () => {
 });
 
 document.addEventListener('visibilitychange', async () => {
-  if (document.visibilityState !== 'visible' || !stream) return;
+  if (document.visibilityState === 'hidden') {
+    hiddenAt = performance.now();
+    return;
+  }
+  if (!stream) return;
   void keepAwake();
-  if (stream.getVideoTracks()[0]?.readyState === 'ended') await restartCamera();
+  const track = stream.getVideoTracks()[0];
+  if (!track || track.readyState === 'ended' || track.muted) await restartCamera();
+  if (performance.now() - hiddenAt > RESUME_AFTER_MS) {
+    setStatus('Reconnecting to the Mac…');
+    signal.reconnectNow();
+  }
 });
 
 const signal = new Signal({
@@ -215,10 +228,22 @@ function showStream() {
 
 async function keepAwake() {
   try {
-    if (!wakeLock || wakeLock.released) wakeLock = await navigator.wakeLock?.request('screen');
+    if (!wakeLock || wakeLock.released) {
+      wakeLock = (await navigator.wakeLock?.request('screen')) ?? null;
+      wakeLock?.addEventListener('release', renderAwake);
+    }
   } catch {
-    // Wake Lock needs iOS 16.4+; without it the phone may dim but keeps streaming.
+    // Unsupported (before iOS 16.4) or refused (e.g. Low Power Mode): the pill tells the user.
+    wakeLock = null;
   }
+  renderAwake();
+}
+
+function renderAwake() {
+  const held = !!wakeLock && !wakeLock.released;
+  awakeEl.hidden = false;
+  awakeEl.classList.toggle('warn', !held);
+  awakeEl.textContent = held ? '☀ Screen stays on' : '⚠ Keep the screen on';
 }
 
 function setTally(state: Tally) {

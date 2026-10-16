@@ -152,10 +152,19 @@ button {
 }
 
 .me,
+.awake,
 .status {
   padding: 6px 10px;
   border-radius: 999px;
   background: rgb(0 0 0 / 0.55);
+}
+
+.awake {
+  margin-right: auto;
+}
+
+.awake.warn {
+  background: rgb(161 98 7 / 0.85);
 }
 
 .tally-label {

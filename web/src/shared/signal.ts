@@ -10,6 +10,7 @@ export interface SignalOptions {
 export class Signal {
   #ws: WebSocket | null = null;
   #stopped = false;
+  #retry: ReturnType<typeof setTimeout> | undefined;
   #options: SignalOptions;
 
   constructor(options: SignalOptions) {
@@ -17,6 +18,7 @@ export class Signal {
   }
 
   connect(): void {
+    clearTimeout(this.#retry);
     this.#stopped = false;
     const scheme = location.protocol === 'https:' ? 'wss' : 'ws';
     const ws = new WebSocket(`${scheme}://${location.host}/ws`);
@@ -31,7 +33,7 @@ export class Signal {
       this.#ws = null;
       this.#options.onStatus?.(false);
       if (!this.#stopped && event.code !== 4000 && event.code !== 4001 && event.code !== 4003) {
-        setTimeout(() => this.connect(), 1000);
+        this.#retry = setTimeout(() => this.connect(), 1000);
       }
     };
   }
@@ -40,7 +42,17 @@ export class Signal {
     if (this.#ws?.readyState === WebSocket.OPEN) this.#ws.send(JSON.stringify(msg));
   }
 
+  /** Drops a possibly half-dead socket (e.g. after iOS suspended the page) and connects right away. */
+  reconnectNow(): void {
+    if (this.#stopped) return;
+    const old = this.#ws;
+    this.#ws = null;
+    old?.close();
+    this.connect();
+  }
+
   stop(): void {
+    clearTimeout(this.#retry);
     this.#stopped = true;
     this.#ws?.close();
     this.#ws = null;
