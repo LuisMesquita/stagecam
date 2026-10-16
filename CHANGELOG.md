@@ -8,10 +8,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 
-- Halloween effect pack: night vision, VHS horror tape, blood moon, thermal camera, possessed,
-  old horror film, melt, lightning storm, zombie skin, funhouse bulge and ghost trails.
-- Face tracking with MediaPipe Face Landmarker (bundled, offline) and four masks: skull face,
-  demon face with mouth fire, glowing eyes, and a 3D pumpkin head that turns with the head.
+- Halloween effects: blood moon, VHS horror tape, possessed and old horror film.
 - Auto director: picks cameras, looks and transitions, paced by the music's energy, with a
   Halloween style.
 - `npm run gallery` renders every effect on a test portrait.

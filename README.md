@@ -85,30 +85,17 @@ Choose **🎃 Halloween** next to the button to use only the creepy looks. If yo
 a slot live by hand, your shot gets a full shot length before the auto director moves on. To add a
 look, append it to `LOOKS`. A unit test checks that it only uses effects and params that exist.
 
-## Halloween pack and face masks
+## Halloween pack
 
-Effects marked 🎃 are the creepy ones: night vision, VHS horror tape, blood moon, thermal camera,
-possessed (glowing edges), old horror film, melt, lightning storm, zombie skin, funhouse bulge and
-ghost trails. Ghost trails needs movement: people leave fading, floating echoes.
+Effects marked 🎃 are the creepy ones:
 
-Four of them track faces with [MediaPipe Face Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker),
-which runs in the director and needs no internet:
+- **Blood moon:** red duotone with a vignette. Link _Pulse_ to `beat`.
+- **VHS horror tape:** tracking errors, color bleed, noise and wobble.
+- **Possessed:** glowing edges on a dark, inverted image, with flicker.
+- **Old horror film:** sepia, grain, scratches, dust and flicker.
 
-| Effect             | What it does                                                                      |
-| ------------------ | --------------------------------------------------------------------------------- |
-| 🎃 Skull face      | Bone-white skull paint on the 3D face mesh, so it follows expressions             |
-| 🎃 Demon face      | Red demon paint, burning eyes, and fire inside the mouth when it opens            |
-| 🎃 Glowing eyes    | Black eyes with a glow on each iris (choose the color with _Hue_)                 |
-| 🎃 Pumpkin head 3D | A carved, candle-lit pumpkin that turns with the head; its mouth opens with yours |
-
-- **Faces:** up to 3 per camera. Tracking only runs on cameras that a face effect is applied to.
-- **Distance:** faces must be large enough in the picture, roughly a head-and-shoulders shot.
-  People far away in a wide shot aren't detected.
-- **Auto director:** the Halloween style also uses these looks (_Pumpkin party_, _Skull crew_,
-  _Demonic_, _Watching you_). Without a face in the shot, the mask simply doesn't appear.
-- **Writing your own:** set `needsFaces: true` on a custom effect, and `ctx.faces` gives you 478
-  landmarks per face in output pixels, plus expression scores such as `jawOpen`.
-  `web/src/faces/` has the helpers.
+The auto director's **🎃 Halloween** style builds its looks from these four, sometimes combined with
+B&W contrast or RGB glitch.
 
 ## Camera health
 

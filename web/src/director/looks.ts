@@ -62,16 +62,19 @@ export const LOOKS: Look[] = [
   { name: 'B&W drama', energy: ['calm', 'mid'], effects: [{ type: 'bw-contrast' }] },
 
   {
-    name: 'Night watch',
-    halloween: true,
-    energy: ['calm', 'mid'],
-    effects: [{ type: 'night-vision', mods: { gain: level(0.25) } }],
-  },
-  {
     name: 'Found footage',
     halloween: true,
     energy: ['mid'],
     effects: [{ type: 'vhs-horror', params: { tracking: 0.3 }, mods: { tracking: beat(0.6) } }],
+  },
+  {
+    name: 'Cursed tape',
+    halloween: true,
+    energy: ['calm', 'mid'],
+    effects: [
+      { type: 'vhs-horror', params: { tracking: 0.2, noise: 0.5 } },
+      { type: 'bw-contrast', params: { contrast: 1.6, grain: 0.1 } },
+    ],
   },
   {
     name: 'Blood moon',
@@ -85,8 +88,14 @@ export const LOOKS: Look[] = [
     energy: ['wild'],
     effects: [
       { type: 'possessed', mods: { glow: bass(0.4) } },
-      { type: 'lightning', params: { chance: 0.1 }, mods: { strike: beat(0.9) } },
+      { type: 'rgb-glitch', params: { split: 0.006, glitch: 0.1 }, mods: { glitch: beat(0.6) } },
     ],
+  },
+  {
+    name: 'Possessed in red',
+    halloween: true,
+    energy: ['mid', 'wild'],
+    effects: [{ type: 'possessed', params: { hue: 0 }, mods: { glow: beat(0.8) } }],
   },
   {
     name: 'Haunted reel',
@@ -95,36 +104,12 @@ export const LOOKS: Look[] = [
     effects: [{ type: 'old-horror-film' }],
   },
   {
-    name: 'Melting zombie',
-    halloween: true,
-    energy: ['mid'],
-    effects: [
-      { type: 'zombie' },
-      { type: 'melt', params: { amount: 0.06 }, mods: { amount: bass(0.1) } },
-    ],
-  },
-  {
-    name: 'Thermal hunt',
-    halloween: true,
-    energy: ['calm', 'mid'],
-    effects: [{ type: 'thermal' }],
-  },
-  {
-    name: 'Ghosts',
+    name: 'Bloody reel',
     halloween: true,
     energy: ['calm', 'mid'],
     effects: [
-      { type: 'ghost-trails', params: { decay: 0.93 } },
-      { type: 'duotone', params: { shadow: 0.62, highlight: 0.55, mix: 0.7 } },
-    ],
-  },
-  {
-    name: 'Storm',
-    halloween: true,
-    energy: ['wild'],
-    effects: [
-      { type: 'bw-contrast', params: { contrast: 2.6 } },
-      { type: 'lightning', params: { chance: 0.2 }, mods: { strike: beat(1) } },
+      { type: 'old-horror-film', params: { sepia: 0 } },
+      { type: 'blood-moon', params: { intensity: 0.45, vignette: 0.6 } },
     ],
   },
 ];
