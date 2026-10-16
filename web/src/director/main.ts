@@ -382,7 +382,9 @@ async function startAudio(input: string) {
     await renderAudioInputs();
     audioSelect.value = input;
   } catch (error) {
+    // analyzer.start() already stopped the previous input, so audio is off now.
     audioSelect.value = '';
+    setBeatCut(0);
     const name = error instanceof DOMException ? error.name : '';
     if (name !== 'NotAllowedError' && name !== 'AbortError')
       toast(String(error instanceof Error ? error.message : error));

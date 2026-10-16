@@ -24,10 +24,16 @@ export default {
   create(gpu) {
     const frames: { target: Target; at: number }[] = [];
     let lastRecord = -Infinity;
+    // Audio links move `seconds` every frame: shrink the ring slowly so a dip doesn't drop history
+    // and the next beat still finds the older frames it reaches back for.
+    let keepSeconds = 0;
+    let lastRender = 0;
     return {
       render(input, params, ctx) {
         const seconds = Math.min(params.seconds, MAX_SECONDS);
-        const capacity = Math.ceil(seconds * RECORD_FPS) + 2;
+        keepSeconds = Math.max(seconds, keepSeconds - (ctx.time - lastRender) / 2);
+        lastRender = ctx.time;
+        const capacity = Math.ceil(keepSeconds * RECORD_FPS) + 2;
         while (frames.length > capacity) gpu.deleteTarget(frames.shift()!.target);
         if (ctx.time - lastRecord >= 1 / RECORD_FPS - 0.002) {
           lastRecord = ctx.time;
