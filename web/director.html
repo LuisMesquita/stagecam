@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="data:," />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>StageCam Director</title>
+    <link rel="stylesheet" href="/src/director/director.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <h1>Stage<span>Cam</span></h1>
+      <span id="link" class="pill">Connecting…</span>
+      <span id="camera-count" class="pill">0 cameras</span>
+      <span class="spacer"></span>
+      <button id="live-toggle" class="toggle" type="button" title="L">LIVE edit: off</button>
+      <button id="add-cameras" type="button">Add cameras (QR)</button>
+      <button id="open-output" class="primary" type="button">Open output window</button>
+    </header>
+
+    <div class="app">
+      <main class="stage">
+        <div class="monitors">
+          <figure class="monitor preview">
+            <figcaption>PREVIEW</figcaption>
+            <canvas id="preview" width="640" height="360"></canvas>
+          </figure>
+          <figure class="monitor program">
+            <figcaption>PROGRAM</figcaption>
+            <canvas id="program" width="640" height="360"></canvas>
+          </figure>
+        </div>
+
+        <div class="switcher">
+          <button id="cut" class="big" type="button" title="Space">CUT</button>
+          <button id="auto" class="big auto" type="button" title="Enter">AUTO</button>
+          <select id="transition" aria-label="Transition"></select>
+          <label class="duration">
+            <span>Duration</span>
+            <input id="duration" type="range" min="0.2" max="3" step="0.1" value="0.8" />
+            <output id="duration-out">0.8 s</output>
+          </label>
+          <div class="progress"><div id="progress-bar"></div></div>
+        </div>
+
+        <section id="multiview" class="multiview" aria-label="Cameras"></section>
+        <p id="empty" class="empty">
+          No cameras yet. Click <strong>Add cameras (QR)</strong> and scan the code with an iPhone.
+        </p>
+      </main>
+
+      <aside class="side">
+        <section class="slots-section">
+          <h2>
+            Scene slots
+            <small>click / F1–F9 = go live · ⌥ = load to preview · ⇧ = save preview</small>
+          </h2>
+          <div id="slots" class="slots"></div>
+          <label class="row">
+            <span>If a camera drops, go to</span>
+            <select id="safe"></select>
+          </label>
+        </section>
+        <div id="panel" class="panel"></div>
+      </aside>
+    </div>
+
+    <dialog id="qr-dialog" class="qr-dialog">
+      <h2>Join as a camera</h2>
+      <p>
+        Same Wi-Fi as this Mac. Scan, accept the certificate warning ("visit this website"), then
+        allow the camera.
+      </p>
+      <canvas id="qr"></canvas>
+      <code id="cam-url"></code>
+      <form method="dialog"><button type="submit">Done</button></form>
+    </dialog>
+
+    <div id="toast" class="toast" hidden></div>
+    <div id="videos" class="videos" aria-hidden="true"></div>
+    <script type="module" src="/src/director/main.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="data:," />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no"
+    />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#000000" />
+    <title>StageCam Camera</title>
+    <link rel="stylesheet" href="/src/cam/cam.css" />
+  </head>
+  <body>
+    <main id="setup" class="setup">
+      <h1>Stage<span>Cam</span></h1>
+      <p class="lead">Your phone becomes a camera on the big screen.</p>
+      <label class="field">
+        <span>Your name</span>
+        <input id="name" maxlength="32" autocomplete="nickname" placeholder="e.g. Ana" />
+      </label>
+      <div class="facing" role="radiogroup" aria-label="Camera">
+        <button type="button" data-facing="environment" aria-pressed="true">Back camera</button>
+        <button type="button" data-facing="user" aria-pressed="false">Selfie camera</button>
+      </div>
+      <button id="start" class="primary" type="button">Start camera</button>
+      <p class="hint">Hold the phone sideways and keep this page open while you film.</p>
+      <p id="setup-error" class="error" hidden></p>
+    </main>
+
+    <main id="live" class="live" hidden>
+      <video id="preview" autoplay muted playsinline></video>
+      <div class="tally-frame"></div>
+      <header class="bar">
+        <span id="me" class="me"></span>
+        <span id="status" class="status">Connecting…</span>
+      </header>
+      <div id="tally" class="tally-label" hidden></div>
+      <div class="rotate-hint">Turn your phone sideways ↻</div>
+      <button id="flip" class="flip" type="button" aria-label="Switch camera">⟲</button>
+      <div id="overlay" class="overlay" hidden></div>
+    </main>
+
+    <script type="module" src="/src/cam/main.ts"></script>
+  </body>
+</html>

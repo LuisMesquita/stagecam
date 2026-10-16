@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" href="data:," />
+    <title>StageCam Output</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #000;
+        overflow: hidden;
+      }
+      canvas {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        display: block;
+      }
+      :fullscreen,
+      :fullscreen canvas {
+        cursor: none;
+      }
+      #hint {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        color: #fff;
+        font:
+          600 28px -apple-system,
+          BlinkMacSystemFont,
+          sans-serif;
+        background: rgb(0 0 0 / 0.55);
+        cursor: pointer;
+      }
+      :fullscreen #hint {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="out" width="1280" height="720"></canvas>
+    <div id="hint">Click to go fullscreen</div>
+    <script type="module" src="/src/output/main.ts"></script>
+  </body>
+</html>
