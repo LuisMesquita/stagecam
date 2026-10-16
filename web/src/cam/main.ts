@@ -133,6 +133,8 @@ function handleMessage(msg: ServerMsg) {
       signal.stop();
       closePeer();
       stream?.getTracks().forEach((track) => track.stop());
+      // No stream: coming back from the background must not reopen the camera or hide this message.
+      stream = null;
       showOverlay('The director removed this camera. Reload the page to join again.');
       break;
     case 'error':
