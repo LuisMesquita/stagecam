@@ -21,6 +21,11 @@ export interface Camera {
 
 const NUMBERS_KEY = 'stagecam.cameraNumbers';
 const STATS_INTERVAL_MS = 1000;
+/**
+ * `?codec=any` on the director URL skips the H.264 preference. Tests use it: Chrome as a *sender*
+ * stalls in its hardware H.264 encoder when headless, which never happens with iPhones.
+ */
+const PREFER_H264 = new URLSearchParams(location.search).get('codec') !== 'any';
 
 /** Receives one WebRTC stream per phone and feeds it to the engine. */
 export class CameraManager {
@@ -175,7 +180,7 @@ export class CameraManager {
       this.onChange();
     };
     await pc.setRemoteDescription(offer);
-    preferH264(pc);
+    if (PREFER_H264) preferH264(pc);
     for (const candidate of camera.pending) await pc.addIceCandidate(candidate).catch(() => {});
     camera.pending = [];
     await pc.setLocalDescription(await pc.createAnswer());

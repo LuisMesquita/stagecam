@@ -57,7 +57,7 @@ try {
   const director = await context.newPage();
   director.on('console', (m) => m.type() === 'error' && errors.push(`director: ${m.text()}`));
   director.on('pageerror', (e) => errors.push(`director: ${e.message}`));
-  await director.goto(DIRECTOR);
+  await director.goto(`${DIRECTOR}/director.html?codec=any`);
 
   const cams: Page[] = [];
   for (const name of ['Ana', 'Ben']) {

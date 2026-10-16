@@ -12,7 +12,8 @@
     "fmt": "vp fmt",
     "typecheck": "tsc --noEmit",
     "check": "vp check && tsc --noEmit && vp test run",
-    "e2e": "node tests/e2e.ts"
+    "e2e": "node tests/e2e.ts",
+    "gallery": "vp build && node tests/gallery.ts"
   },
   "dependencies": {
     "qrcode": "^1.5.4",
