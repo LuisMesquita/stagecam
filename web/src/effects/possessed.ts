@@ -19,7 +19,7 @@ vec4 effect(vec2 uv) {
   float gy = tl + 2.0 * t + tr - bl - 2.0 * b - br;
   float edge = length(vec2(gx, gy));
   float base = 1.0 - luma(texture(u_input, uv).rgb);
-  float f = 1.0 - u_flicker * step(0.85, hash(vec2(floor(u_time * 15.0), 3.0)));
+  float f = 1.0 - u_flicker * step(0.85, hash(vec2(mod(floor(u_time * 15.0), 1000.0), 3.0)));
   vec3 o = vec3(base * 0.12) + hsv2rgb(vec3(u_hue, 1.0, 1.0)) * edge * u_glow * 2.0;
   return vec4(o * f, 1.0);
 }`,

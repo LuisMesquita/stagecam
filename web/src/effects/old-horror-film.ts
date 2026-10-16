@@ -12,7 +12,7 @@ export default {
   ],
   glsl: `
 vec4 effect(vec2 uv) {
-  float frame = floor(u_time * 18.0);
+  float frame = mod(floor(u_time * 18.0), 1000.0);
   vec2 p = uv + vec2(0.0, (hash(vec2(frame, 1.0)) - 0.5) * 0.004);
   float l = (luma(texture(u_input, p).rgb) - 0.5) * 1.3 + 0.5;
   l *= 1.0 - u_flicker * 0.25 * hash(vec2(frame, 2.0));

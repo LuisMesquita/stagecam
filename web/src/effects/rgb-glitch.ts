@@ -11,7 +11,7 @@ export default {
   ],
   glsl: `
 vec4 effect(vec2 uv) {
-  float t = floor(u_time * u_speed * 12.0);
+  float t = mod(floor(u_time * u_speed * 12.0), 1000.0);
   float band = floor(uv.y * 28.0);
   float r = hash(vec2(band, t));
   float shift = r > 1.0 - u_glitch * 0.45 ? (hash(vec2(t, band)) - 0.5) * 0.25 * u_glitch : 0.0;

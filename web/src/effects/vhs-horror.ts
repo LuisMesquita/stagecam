@@ -13,7 +13,7 @@ export default {
   glsl: `
 vec4 effect(vec2 uv) {
   float t = u_time;
-  float frame = floor(t * 30.0);
+  float frame = mod(floor(t * 30.0), 1000.0);
   float wob = (sin(uv.y * 30.0 + t * 3.0) * 0.002 + sin(uv.y * 3.0 + t) * 0.003) * u_wobble;
   float band = 1.0 - smoothstep(0.0, 0.03, abs(uv.y - fract(t * 0.15)));
   float tear = band * u_tracking * 0.2 * (hash(vec2(floor(uv.y * 200.0), frame)) - 0.5);
@@ -25,7 +25,7 @@ vec4 effect(vec2 uv) {
   );
   c = mix(c, vec3(luma(c)), 0.35);
   c += (hash(vec2(uv.y * u_resolution.y, frame)) - 0.5) * u_noise * 0.3;
-  c += band * u_tracking * 0.45 * hash(uv * u_resolution + t);
+  c += band * u_tracking * 0.45 * hash(uv * u_resolution + fract(t) * 100.0);
   c *= 0.92 + 0.08 * sin(uv.y * u_resolution.y * 0.8);
   return vec4(c, 1.0);
 }`,

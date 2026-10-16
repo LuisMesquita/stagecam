@@ -11,6 +11,7 @@ out vec4 outColor;
 /** Helpers available to every effect and transition. */
 const LIBRARY = `
 float luma(vec3 c) { return dot(c, vec3(0.299, 0.587, 0.114)); }
+// Keep inputs small (e.g. mod(frame, 1000.0)): sin() loses precision on large values and the noise freezes.
 float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 vec3 hsv2rgb(vec3 c) {
   vec3 p = abs(fract(c.xxx + vec3(0.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0);
