@@ -24,6 +24,8 @@ export interface AutoDecision {
   look: string;
 }
 
+/** With audio but no beats (between songs, a quiet room), still move on after this long. */
+const MAX_SHOT_MS = 20_000;
 const SHOT_BEATS: Record<Energy, number[]> = { wild: [2, 4, 4], mid: [8], calm: [16] };
 const SUPERIMPOSE_BLENDS: BlendMode[] = ['screen', 'difference', 'lighten'];
 
@@ -74,9 +76,10 @@ export class AutoDirector {
   update(ctx: AutoContext): AutoDecision | null {
     this.#energy += (ctx.signals.level - this.#energy) * 0.02;
     if (!this.enabled || ctx.cameras.length === 0) return null;
+    const elapsed = ctx.now - this.#shotStart;
     const due = ctx.audio
-      ? this.#beats >= this.#shotBeats
-      : ctx.now - this.#shotStart >= this.#shotMs;
+      ? this.#beats >= this.#shotBeats || elapsed >= MAX_SHOT_MS
+      : elapsed >= this.#shotMs;
     if (!due) return null;
     const decision = this.#compose(ctx);
     this.restart(ctx.now);

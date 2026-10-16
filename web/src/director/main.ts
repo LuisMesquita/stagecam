@@ -55,6 +55,8 @@ let outputWindow: Window | null = null;
 let outputCtx: CanvasRenderingContext2D | null = null;
 const sentTally = new Map<string, Tally>();
 let refreshPanel = () => {};
+/** The scene the editor panel was last built for. */
+let panelScene: Scene | null = null;
 
 // ---- signaling --------------------------------------------------------------
 
@@ -84,7 +86,9 @@ engine.safeScene = () => {
   return slot ?? newScene(SLATE);
 };
 engine.onChange = () => {
-  renderPanelNow();
+  // Auto-director shots replace Program every beat or two; rebuilding an unchanged Preview editor
+  // each time would cut off slider drags and close open pickers.
+  if (live || !autoDirector.enabled || engine.preview !== panelScene) renderPanelNow();
   renderMultiview();
 };
 engine.onFailSafe = (lost) => {
@@ -314,6 +318,7 @@ function renderPanelNow() {
     { value: BLACK, label: 'Black' },
   ];
   const scene = live ? engine.program : engine.preview;
+  panelScene = scene;
   for (const layer of scene.layers) {
     if (!sources.some((s) => s.value === layer.sourceId))
       sources.unshift({ value: layer.sourceId, label: 'Missing camera' });

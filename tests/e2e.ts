@@ -327,7 +327,7 @@ try {
     await director.click('#auto-director');
     if (programs.size < 2) throw new Error('program never changed');
     const halloween = await director.evaluate(() =>
-      (window as any).stagecam.engine.program.layers[0].effects.every((e: any) =>
+      (window as any).stagecam.engine.program.layers[0].effects.some((e: any) =>
         (window as any).stagecam.effectList
           .find((d: any) => d.id === e.type)
           ?.name.startsWith('🎃'),

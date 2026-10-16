@@ -114,6 +114,14 @@ describe('AutoDirector', () => {
     expect(director.update(context({ audio: false, now: 7100 }))).not.toBeNull();
   });
 
+  it('moves on after 20 s when audio is on but no beats come', () => {
+    const director = new AutoDirector(seeded(7));
+    director.enabled = true;
+    director.restart(0);
+    expect(director.update(context({ now: 19_000 }))).toBeNull();
+    expect(director.update(context({ now: 20_100 }))).not.toBeNull();
+  });
+
   it('waits when no camera has video', () => {
     const director = new AutoDirector(seeded(6));
     director.enabled = true;
